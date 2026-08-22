@@ -1,0 +1,82 @@
+# Filter-DiskANN (Vamana) Tuning Pipeline Configuration
+# Independent pipeline architecture — modeled on configs/unify_tune.yaml
+
+benchmark:
+  script_path: benchmarks/diskann_memory_filtered_benchmark.py
+  python_bin: python
+  metrics_output_arg: --metrics-output
+  param_args:
+    R: --R
+    Lbuild: --Lbuild
+    FilterLBuild: --FilteredLbuild
+    alpha: --alpha
+    L: --search-list
+  extra_args:
+    - --data_path
+    - data/glove_filtered.hdf5
+    - --index_path_prefix
+    - indexes/filter_diskann
+    - --label_file
+    - data/glove_filtered_labels.txt
+    - --universal_label
+    - background
+    - --query_file
+    - data/glove_query.bin
+    - --gt_file
+    - data/glove_groundtruth.bin
+    - --filter_label
+    - sel_0p50
+    - --result_path
+    - results/filter_diskann/search
+    - --data_type
+    - float
+    - --dist_fn
+    - l2
+    - --k
+    - "10"
+    - --num_threads
+    - "1"
+
+tuning:
+  param_order: [R, FilterLBuild, alpha, L]
+
+search:
+  budget: 50
+  repeat: 1
+  seed: 42
+  recall_threshold: 0.95
+  recall_slack: 0.005
+
+agentic:
+  enabled: true
+  # Optional: initialize ONLY from a historical-task subgroup-mining insight
+  # JSON — its mined range becomes the execution-time tuning constraint and
+  # its mined best point the initial-design seed (seed rounds do not consume
+  # the budget). Changing json_path requires --no-resume.
+  # subgroup_init:
+  #   json_path: <path to a historical-task subgroup-mining insight JSON>
+  logging:
+    mode: verbose
+
+execution:
+  max_workers: 1
+  timeout_s: 4000
+  retries: 0
+
+output:
+  dir: results/filter_diskann
+  trials_name: filter_diskann_tune
+
+params:
+  R:
+    min: 16
+    max: 64
+  FilterLBuild:
+    min: 20
+    max: 100
+  alpha:
+    min: 1.0
+    max: 1.4
+  L:
+    min: 10
+    max: 100

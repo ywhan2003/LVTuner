@@ -1,0 +1,73 @@
+benchmark:
+  script_path: benchmarks/diskann_memory_filtered_benchmark.py
+  python_bin: python
+  metrics_output_arg: --metrics-output
+  param_args:
+    R: --R
+    Lbuild: --Lbuild
+    FilteredLBuild: --FilteredLbuild
+    alpha: --alpha
+    L: --search-list
+  extra_args:
+    - --data_path
+    - data/glove/base.bin
+    - --index_path_prefix
+    - indexes/glove
+    - --label_file
+    - data/glove/selectivity_0p50/base_labels.txt
+    - --universal_label
+    - background
+    - --query_file
+    - data/glove/query.bin
+    - --gt_file
+    - data/glove/selectivity_0p50/groundtruth.bin
+    - --filter_label
+    - sel_0p50
+    - --result_path
+    - results/diskann_filter/glove
+    - --data_type
+    - float
+    - --dist_fn
+    - cosine
+    - --k
+    - "10"
+    - --num_threads
+    - "1"
+
+tuning:
+  param_order: [R, Lbuild, FilteredLBuild, alpha, L]
+
+search:
+  budget: 100
+  repeat: 1
+  seed: 42
+  recall_threshold: 0.95
+  recall_slack: 0.001
+
+agentic:
+  enabled: true
+  objective_preference: pareto
+  proposer_retry:
+    max_attempts: 3
+  # Optional: initialize ONLY from a historical-task subgroup-mining insight
+  # JSON — its mined range becomes the execution-time tuning constraint and
+  # its mined best point the initial-design seed (seed rounds do not consume
+  # the budget). Changing json_path requires --no-resume.
+  # subgroup_init:
+  #   json_path: <path to a historical-task subgroup-mining insight JSON>
+
+execution:
+  max_workers: 1
+  timeout_s: 4000
+  retries: 0
+
+output:
+  dir: results/diskann_filter
+  trials_name: glove_filter_0p50_95
+
+params:
+  R: [16, 32, 48, 64]
+  Lbuild: [20, 30, 40, 50, 60, 70, 80, 90, 100]
+  FilteredLBuild: [20, 30, 40, 50, 60, 70, 80, 90, 100]
+  alpha: [1.0, 1.1, 1.2, 1.4]
+  L: [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]

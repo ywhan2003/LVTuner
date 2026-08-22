@@ -1,0 +1,9 @@
+__pycache__/
+.DS_Store
+.env
+.rag/
+.vscode/
+models/
+RFANNSTuner/
+indexes/
+build/

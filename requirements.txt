@@ -1,0 +1,14 @@
+h5py>=3.0
+langchain==0.3.26
+langchain-chroma==0.2.6
+langchain-community==0.3.27
+langchain-core==0.3.83
+langchain-openai==0.3.35
+langchain-text-splitters==0.3.8
+langsmith==0.4.5
+numpy>=1.24
+pandas>=2.0
+pybind11>=2.0
+torch==2.10.0
+gpytorch==1.15.1
+botorch==0.17.0

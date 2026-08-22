@@ -1,0 +1,37 @@
+[project]
+name = "rfannstuner"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "botorch==0.17.0",
+    "gpytorch==1.15.1",
+    "h5py>=3.0",
+    "hnswlib",
+    "langchain==0.3.26",
+    "langchain-chroma==0.2.6",
+    "langchain-community==0.3.27",
+    "langchain-core==0.3.83",
+    "langchain-openai==0.3.35",
+    "langchain-text-splitters==0.3.8",
+    "langsmith==0.4.5",
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "pybind11>=2.0",
+    "python-dotenv>=1.0",
+    "termcolor>=2.0",
+    "torch==2.10.0",
+]
+
+[dependency-groups]
+dev = [
+    "cmake>=4.4.0",
+    "ninja>=1.13.0",
+    "pybind11>=3.0.4",
+    "setuptools>=83.0.0",
+    "wheel>=0.47.0",
+]
+
+[tool.uv.sources]
+hnswlib = { path = "hnswlib", editable = true }
+
+

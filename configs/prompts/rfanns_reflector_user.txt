@@ -1,0 +1,33 @@
+You are the ANN tuning reflector.
+
+Summarize round outcomes for next-round guidance.
+
+Round: {round_idx}
+Objective: {objective_text}
+Recall threshold: {recall_threshold}
+Recall slack: {recall_slack}
+Selection mode: {selection_mode}
+Cold-start diversity mode: {cold_start_diversity_mode}
+Cold-start diversity reason: {cold_start_diversity_reason}
+Selection context:
+{selection_context}
+Round results:
+{round_results}
+
+History summary:
+{history_summary}
+
+Previous reflection:
+{reflection}
+
+Output rules:
+1. Return strict JSON only.
+2. JSON schema:
+{
+  "high_potential": ["short bullet", "..."],
+  "failure_modes": ["short bullet", "..."],
+  "next_focus": "one sentence",
+  "threshold_reached": false,
+  "fastest_feasible": null
+}
+3. Do not output text outside JSON.

@@ -1,0 +1,73 @@
+# SIFT-128 L2, recall threshold 0.95 — subgroup-mining initialization run.
+# Initialization: single best config mined from sift.jsonl (subgroup_init);
+# the mined range becomes the execution-time tuning constraint. The search
+# budget of 20 covers LLM tuning rounds ONLY (the init seed does not count).
+# All LLM calls use the .env configuration (model_config_key: DEEPSEEK_CONFIG).
+
+benchmark:
+  script_path: benchmarks/hnswlib_benchmark.py
+  python_bin: .venv/bin/python
+  metrics_output_arg: --metrics-output
+  param_args:
+    M: --M
+    ef_construction: --ef-construction
+    ef: --ef
+  extra_args:
+    - --data-path
+    - /home/ywhan/data/sift-128-euclidean.hdf5
+    - --space
+    - l2
+    - --k
+    - "10"
+    - --num-threads
+    - "1"
+    - --build-num-threads
+    - "32"
+    - --query-num-threads
+    - "1"
+    - --index-cache-dir
+    - results/hnswlib/indexes
+    - --select-recall-threshold
+    - "0.95"
+    - --select-recall-slack
+    - "0"
+
+tuning:
+  param_order: [M, ef_construction, ef]
+
+search:
+  budget: 20
+  repeat: 1
+  seed: 42
+  recall_threshold: 0.95
+  recall_slack: 0.000
+
+agentic:
+  enabled: true
+  subgroup_init:
+    json_path: /home/ywhan/coding/RFANNSTuner/data/hnswlib_insights/sift.json
+  logging:
+    mode: verbose
+
+execution:
+  max_workers: 1
+  timeout_s: 4000
+  retries: 0
+
+output:
+  dir: results/hnswlib
+  trials_name: sift_95_subgroup_init
+
+params:
+  M:
+    min: 8
+    max: 128
+    integer: true
+  ef_construction:
+    min: 100
+    max: 2000
+    integer: true
+  ef:
+    min: 15
+    max: 1000
+    integer: true

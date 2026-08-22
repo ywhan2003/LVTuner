@@ -1,0 +1,1 @@
+Provide parameter proposals as strict JSON.

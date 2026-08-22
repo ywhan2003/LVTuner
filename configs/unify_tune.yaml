@@ -1,0 +1,67 @@
+# UNIFY (HSIG) Tuning Pipeline Configuration
+# Modeled on configs/hnswlib_tune.yaml
+
+benchmark:
+  script_path: UNIFY/benchmark/code/search_hsig.py
+  python_bin: python
+  metrics_output_arg: --metrics-output
+  extra_args:
+    - --data_path
+    - data/sift_hybrid.hdf5
+    - --index_cache_path
+    - UNIFY/benchmark/index/unify
+    - --result_save_path
+    - UNIFY/benchmark/results/unify.csv
+    - --k
+    - "10"
+    - --plan
+    - "0"
+    - --use_mbv_hnsw
+  # param_args: {}   # optional: map param name → CLI flag
+
+tuning:
+  param_order: [M, B, efConstruction, ef, al]
+
+search:
+  budget: 40
+  repeat: 1
+  seed: 42
+  recall_threshold: 0.95
+  recall_slack: 0.005
+
+agentic:
+  enabled: true
+  # Optional: initialize ONLY from a historical-task subgroup-mining insight
+  # JSON — its mined range becomes the execution-time tuning constraint and
+  # its mined best point the initial-design seed (seed rounds do not consume
+  # the budget). Changing json_path requires --no-resume.
+  # subgroup_init:
+  #   json_path: <path to a historical-task subgroup-mining insight JSON>
+  logging:
+    mode: verbose
+
+execution:
+  max_workers: 1
+  timeout_s: 7200
+  retries: 0
+
+output:
+  dir: results/unify
+  trials_name: unify_tune
+
+params:
+  M:
+    min: 8
+    max: 64
+  B:
+    min: 4
+    max: 8
+  efConstruction:
+    min: 30
+    max: 4000
+  ef:
+    min: 10
+    max: 1000
+  al:
+    min: 8
+    max: 256

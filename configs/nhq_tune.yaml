@@ -1,0 +1,63 @@
+# NHQ (Native Hybrid Query) Full Tuning — SIFT-128 L2, selectivity 0.5, threshold 0.95
+# 51 rounds budget
+
+benchmark:
+  script_path: benchmarks/nhq_benchmark.py
+  python_bin: .venv/bin/python
+  metrics_output_arg: --metrics-output
+  param_args:
+    M: --M
+    efConstruction: --ef-construction
+    ef: --ef
+    weight: --weight
+  extra_args:
+    - --data-file
+    - data/nhq_data/sift_sel05/base.fvecs
+    - --attr-file
+    - data/nhq_data/sift_sel05/base_attr.txt
+    - --query-file
+    - data/nhq_data/sift_sel05/query.fvecs
+    - --query-attr-file
+    - data/nhq_data/sift_sel05/query_attr.txt
+    - --gt-file
+    - data/nhq_data/sift_sel05/groundtruth.ivecs
+    - --metric
+    - L2
+    - --index-cache-dir
+    - results/nhq/indexes
+
+tuning:
+  param_order: [M, efConstruction, ef, weight]
+
+search:
+  budget: 51
+  repeat: 1
+  seed: 42
+  recall_threshold: 0.95
+  recall_slack: 0.005
+
+agentic:
+  enabled: true
+  # Optional: initialize ONLY from a historical-task subgroup-mining insight
+  # JSON — its mined range becomes the execution-time tuning constraint and
+  # its mined best point the initial-design seed (seed rounds do not consume
+  # the budget). Changing json_path requires --no-resume.
+  # subgroup_init:
+  #   json_path: <path to a historical-task subgroup-mining insight JSON>
+  logging:
+    mode: verbose
+
+execution:
+  max_workers: 1
+  timeout_s: 7200
+  retries: 0
+
+output:
+  dir: results/nhq
+  trials_name: sift_sel05_95
+
+params:
+  M:              {min: 16, max: 500}
+  efConstruction: {min: 50, max: 4000}
+  ef:             {min: 100, max: 1200}
+  weight:         {min: 0, max: 200}
