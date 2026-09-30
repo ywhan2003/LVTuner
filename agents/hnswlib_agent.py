@@ -4324,9 +4324,10 @@ class HNSWLIBTuningAgent:
         historical_context: str = "",
         cold_start_cards: List[Dict[str, Any]] | None = None,
         memory_context: Dict[str, Any] | None = None,
-        static_knowledge_context: str = "",
+        conditional_policy_context: str = "",
         proposal_check_feedback: str = "",
         interval_table_context: str = "",
+        regression_tree_context: str = "",
         force_construction: bool = False,
         excluded_construction_pairs: Optional[set] = None,
     ) -> Tuple[Dict[str, Any] | None, Dict[str, Any]]:
@@ -4336,6 +4337,14 @@ class HNSWLIBTuningAgent:
         executed configuration's full metrics, the current optimization state,
         the success memory, and the diagnostic tree, then outputs a diagnosis
         and exactly one candidate configuration for the next round.
+
+        ``regression_tree_context`` carries the pruned-region block rendered by
+        ``utils.regression_tree_init`` when ``agentic.initial_design.mode ==
+        "regression_tree"``; when empty, nothing is injected.
+
+        ``conditional_policy_context`` carries the deterministic matcher block
+        rendered by ``conditional_policy.runtime.format_policy_context``; when
+        empty, nothing is injected.
 
         Returns ``(candidate_dict, diagnostic_log)`` where *candidate_dict* is
         ``{"params": {...}, "source": "diagnostic", "note": "..."}`` or
@@ -4596,6 +4605,12 @@ class HNSWLIBTuningAgent:
             "interval_table_context": (
                 interval_table_context if interval_table_context else "(none)"
             ),
+            "regression_tree_context": (
+                regression_tree_context if regression_tree_context else "(none)"
+            ),
+            "conditional_policy_context": (
+                conditional_policy_context if conditional_policy_context else "(none)"
+            ),
         }
 
 
@@ -4603,9 +4618,14 @@ class HNSWLIBTuningAgent:
             "You are an HNSW tuning diagnostician. Follow the structured flow below.\n\n"
             f"{cold_start_guidance}"
             + (
-                # ── Selected Static Knowledge (mechanism-level priors) ──
-                f"{static_knowledge_context}\n"
-                if static_knowledge_context else ""
+                # ── Regression-Tree Pruned Regions (history-informed focus) ──
+                f"{regression_tree_context}\n\n"
+                if regression_tree_context else ""
+            )
+            + (
+                # ── Conditional Policy Matches (offline-validated symptom -> intervention priors) ──
+                f"{conditional_policy_context}\n\n"
+                if conditional_policy_context else ""
             )
             + "## Context\n"
             f"RECALL THRESHOLD τ = {threshold:.4f}  (slack = {slack:.4f})\n"

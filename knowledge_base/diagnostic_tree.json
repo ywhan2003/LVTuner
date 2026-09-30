@@ -1,0 +1,464 @@
+[
+  {
+    "metric": "visited_nodes_per_query",
+    "display": "Visited Nodes per Query",
+    "states": {
+      "too_high": {
+        "description": "搜索访问节点过多，搜索路径长或搜索范围过大",
+        "branches": [
+          {
+            "recall_status": "recall_far_above",
+            "cause": "搜索范围过大，存在冗余搜索",
+            "actions": [
+              {
+                "parameter": "ef",
+                "direction": "decrease"
+              }
+            ]
+          },
+          {
+            "recall_status": "recall_near_threshold",
+            "cause": "必须访问大量节点才能满足 Recall，图导航效率较差",
+            "actions": [
+              {
+                "parameter": "efC",
+                "direction": "increase"
+              },
+              {
+                "parameter": "M",
+                "direction": "increase"
+              }
+            ]
+          },
+          {
+            "recall_status": "recall_far_below",
+            "cause": "虽然访问节点较多，但图仍未有效到达真实近邻区域",
+            "actions": [
+              {
+                "parameter": "efC",
+                "direction": "increase"
+              },
+              {
+                "parameter": "M",
+                "direction": "increase"
+              }
+            ]
+          }
+        ]
+      },
+      "too_low": {
+        "description": "搜索访问节点较少，搜索路径短",
+        "branches": [
+          {
+            "recall_status": "recall_far_above",
+            "cause": "搜索访问节点少且 Recall 达标，导航效率较好",
+            "actions": [
+              {
+                "parameter": "ef",
+                "direction": "decrease"
+              }
+            ]
+          },
+          {
+            "recall_status": "recall_near_threshold",
+            "cause": "搜索访问节点少且 Recall 达标，导航效率较好",
+            "actions": [
+              {
+                "parameter": "ef",
+                "direction": "decrease"
+              }
+            ]
+          },
+          {
+            "recall_status": "recall_far_below",
+            "cause": "搜索范围不足",
+            "actions": [
+              {
+                "parameter": "ef",
+                "direction": "increase"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "metric": "dist_comps_per_query",
+    "display": "Distance Computations per Query",
+    "states": {
+      "too_high": {
+        "description": "每次查询距离计算过多，搜索效率低",
+        "branches": [
+          {
+            "recall_status": "recall_far_above",
+            "cause": "进行了过多不必要的距离计算",
+            "actions": [
+              {
+                "parameter": "ef",
+                "direction": "decrease"
+              }
+            ]
+          },
+          {
+            "recall_status": "recall_near_threshold",
+            "cause": "dist_comps ≈ visited_nodes × M/2；访问节点不多但每跳展开邻居过多时，图过密、M 偏大导致每跳计算昂贵。near 阈值下小幅单轴降低 M。",
+            "actions": [
+              {
+                "parameter": "M",
+                "direction": "decrease"
+              }
+            ]
+          },
+          {
+            "recall_status": "recall_far_below",
+            "cause": "计算量已经较大但 Recall 仍不足，图结构质量或容量不足",
+            "actions": [
+              {
+                "parameter": "efC",
+                "direction": "increase"
+              },
+              {
+                "parameter": "M",
+                "direction": "increase"
+              }
+            ]
+          }
+        ]
+      },
+      "too_low": {
+        "description": "每次查询距离计算很少，搜索范围不足",
+        "branches": [
+          {
+            "recall_status": "recall_far_above",
+            "cause": "距离计算效率较高",
+            "actions": []
+          },
+          {
+            "recall_status": "recall_near_threshold",
+            "cause": "距离计算效率较高",
+            "actions": []
+          },
+          {
+            "recall_status": "recall_far_below",
+            "cause": "候选探索和距离评估不足",
+            "actions": [
+              {
+                "parameter": "ef",
+                "direction": "increase"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "metric": "index_size_mb",
+    "display": "Index Size",
+    "states": {
+      "too_high": {
+        "description": "索引相对原始数据过大，图可能过密",
+        "branches": [
+          {
+            "recall_status": "recall_far_above",
+            "cause": "图结构容量存在冗余",
+            "actions": [
+              {
+                "parameter": "M",
+                "direction": "decrease"
+              }
+            ]
+          },
+          {
+            "recall_status": "recall_near_threshold",
+            "cause": "索引大小与 M 成正比；索引过大说明 M 偏大。但 Recall 余量小，只做小幅单轴 M 降低试探。",
+            "actions": [
+              {
+                "parameter": "M",
+                "direction": "decrease"
+              }
+            ]
+          },
+          {
+            "recall_status": "recall_far_below",
+            "cause": "索引虽然大，但边质量或连接分布仍然较差",
+            "actions": [
+              {
+                "parameter": "efC",
+                "direction": "increase"
+              }
+            ]
+          }
+        ]
+      },
+      "too_low": {
+        "description": "索引紧凑，图可能过稀疏",
+        "branches": [
+          {
+            "recall_status": "recall_far_above",
+            "cause": "索引紧凑且满足 Recall",
+            "actions": []
+          },
+          {
+            "recall_status": "recall_near_threshold",
+            "cause": "索引紧凑且满足 Recall",
+            "actions": []
+          },
+          {
+            "recall_status": "recall_far_below",
+            "cause": "图结构容量不足或图过稀疏",
+            "actions": [
+              {
+                "parameter": "M",
+                "direction": "increase"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "metric": "out_degree_mean",
+    "display": "Average Out-Degree",
+    "states": {
+      "too_high": {
+        "description": "平均出度较高，图过密",
+        "branches": [
+          {
+            "recall_status": "recall_far_above",
+            "cause": "图过密，边数量存在冗余",
+            "actions": [
+              {
+                "parameter": "M",
+                "direction": "decrease"
+              }
+            ]
+          },
+          {
+            "recall_status": "recall_near_threshold",
+            "cause": "出度≈M，平均出度过高说明 M 偏大、图比所需更密。near 阈值下 Recall 余量小，可小幅单轴降低 M 减少冗余边。",
+            "actions": [
+              {
+                "parameter": "M",
+                "direction": "decrease"
+              }
+            ]
+          },
+          {
+            "recall_status": "recall_far_below",
+            "cause": "边数量多但边质量差，增加出度没有有效改善导航",
+            "actions": [
+              {
+                "parameter": "efC",
+                "direction": "increase"
+              }
+            ]
+          }
+        ]
+      },
+      "too_low": {
+        "description": "平均出度较低，图过稀疏",
+        "branches": [
+          {
+            "recall_status": "recall_far_above",
+            "cause": "图较稀疏但仍能有效检索",
+            "actions": []
+          },
+          {
+            "recall_status": "recall_near_threshold",
+            "cause": "图较稀疏但仍能有效检索",
+            "actions": []
+          },
+          {
+            "recall_status": "recall_far_below",
+            "cause": "图过稀疏，近邻连接或长程连接不足",
+            "actions": [
+              {
+                "parameter": "M",
+                "direction": "increase"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "metric": "in_degree_distribution",
+    "display": "In-Degree Distribution",
+    "states": {
+      "too_high": {
+        "description": "少数节点入度极高（Hub 过强），或大量节点入度接近 0（弱连接区域）",
+        "branches": [
+          {
+            "recall_status": "recall_far_above",
+            "cause": "Hub 过强，搜索容易集中到少数节点；或分布不均衡但 Recall 可行",
+            "actions": [
+              {
+                "parameter": "efC",
+                "direction": "increase"
+              }
+            ]
+          },
+          {
+            "recall_status": "recall_near_threshold",
+            "cause": "分布不均衡但 Recall 勉强达标，图覆盖可能不稳定",
+            "actions": [
+              {
+                "parameter": "efC",
+                "direction": "increase"
+              }
+            ]
+          },
+          {
+            "recall_status": "recall_far_below",
+            "cause": "入度极低节点 → 弱连接区域难以到达；入度极高节点 → 连接分布失衡，Hub 未能覆盖真实近邻区域",
+            "actions": [
+              {
+                "parameter": "efC",
+                "direction": "increase"
+              },
+              {
+                "parameter": "M",
+                "direction": "increase"
+              }
+            ]
+          }
+        ]
+      },
+      "too_low": {
+        "description": "入度分布较均衡",
+        "branches": [
+          {
+            "recall_status": "recall_far_above",
+            "cause": "图连接结构正常",
+            "actions": [
+              {
+                "parameter": "ef",
+                "direction": "decrease"
+              }
+            ]
+          },
+          {
+            "recall_status": "recall_near_threshold",
+            "cause": "图连接结构正常",
+            "actions": [
+              {
+                "parameter": "ef",
+                "direction": "decrease"
+              }
+            ]
+          },
+          {
+            "recall_status": "recall_far_below",
+            "cause": "问题更可能是搜索范围或整体图容量不足",
+            "actions": [
+              {
+                "parameter": "ef",
+                "direction": "increase"
+              },
+              {
+                "parameter": "M",
+                "direction": "increase"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "metric": "candidate_distance_stats",
+    "display": "Candidate Distance Distribution",
+    "states": {
+      "too_high": {
+        "description": "候选距离下降缓慢（搜索路径低效），或候选距离很快稳定但过早收敛",
+        "branches": [
+          {
+            "recall_status": "recall_far_above",
+            "cause": "虽然最终 Recall 较高，但搜索路径较低效；或优质候选已较早找到，后续搜索收益很小",
+            "actions": [
+              {
+                "parameter": "ef",
+                "direction": "decrease"
+              }
+            ]
+          },
+          {
+            "recall_status": "recall_near_threshold",
+            "cause": "搜索路径低效、候选收敛慢；near 阈值下只做单轴调整，先提高边质量（efC），不改动图规模（M）。",
+            "actions": [
+              {
+                "parameter": "efC",
+                "direction": "increase"
+              }
+            ]
+          },
+          {
+            "recall_status": "recall_far_below",
+            "cause": "搜索未能有效进入真实近邻区域",
+            "actions": [
+              {
+                "parameter": "ef",
+                "direction": "increase"
+              },
+              {
+                "parameter": "efC",
+                "direction": "increase"
+              },
+              {
+                "parameter": "M",
+                "direction": "increase"
+              }
+            ]
+          }
+        ]
+      },
+      "too_low": {
+        "description": "候选距离很快稳定（收敛快），或下降缓慢但 Recall 不足",
+        "branches": [
+          {
+            "recall_status": "recall_far_above",
+            "cause": "优质候选已较早找到，后续搜索收益很小",
+            "actions": [
+              {
+                "parameter": "ef",
+                "direction": "decrease"
+              }
+            ]
+          },
+          {
+            "recall_status": "recall_near_threshold",
+            "cause": "搜索停止位置较合理",
+            "actions": [
+              {
+                "parameter": "ef",
+                "direction": "decrease"
+              }
+            ]
+          },
+          {
+            "recall_status": "recall_far_below",
+            "cause": "搜索过早收敛到错误的局部邻域",
+            "actions": [
+              {
+                "parameter": "ef",
+                "direction": "increase"
+              },
+              {
+                "parameter": "efC",
+                "direction": "increase"
+              },
+              {
+                "parameter": "M",
+                "direction": "increase"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+]

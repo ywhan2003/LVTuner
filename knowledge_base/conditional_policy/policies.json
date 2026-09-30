@@ -1,0 +1,1760 @@
+{
+  "pipeline_config": {
+    "min_pair_support": 20,
+    "min_seed_support": 2,
+    "min_workload_support": 3,
+    "min_success_rate": 0.7,
+    "min_confidence": 0.9,
+    "min_recall_gain": 0.01,
+    "min_relative_qps_gain": 0.02,
+    "min_pair_quality": 0.8,
+    "slack_quantile": 0.1,
+    "bootstrap_samples": 200
+  },
+  "source": "synthetic",
+  "policies": [
+    {
+      "policy_id": "P1",
+      "branch": "qps_improvement",
+      "symptom": {
+        "expansion_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "visit_node_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "dist_comp_cnt": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "traversal_effectiveness": [
+          "low",
+          "lower-middle"
+        ],
+        "recall_state": [
+          "close_above"
+        ]
+      },
+      "diagnosis": "Recall clears the threshold only because traversal volume is high while navigation efficiency is poor: the margin is bought with brute-force width, so cutting effort is likely to violate the threshold.",
+      "candidate_intervention": {
+        "parameter": "ef",
+        "direction": "decrease"
+      },
+      "evidence": {
+        "pair_support": 35,
+        "seed_support": 24,
+        "workload_support": 10,
+        "task_support": 3,
+        "successes": 20,
+        "success_rate": 0.5714,
+        "mean_effect": 1.0319,
+        "effect_ci95": [
+          0.98182,
+          1.08166
+        ],
+        "confidence": 0.047,
+        "posterior_mean": 0.5676
+      },
+      "status": "insufficient_evidence",
+      "reasons": [
+        "P(p > 0.7) = 0.047 < 0.9",
+        "disappears when one workload is left out",
+        "disappears when one seed is left out"
+      ]
+    },
+    {
+      "policy_id": "P2",
+      "branch": "qps_improvement",
+      "symptom": {
+        "expansion_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "visit_node_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "dist_comp_cnt": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "traversal_effectiveness": [
+          "low",
+          "lower-middle"
+        ],
+        "recall_state": [
+          "close_above"
+        ]
+      },
+      "diagnosis": "Recall clears the threshold only because traversal volume is high while navigation efficiency is poor: the margin is bought with brute-force width, so cutting effort is likely to violate the threshold.",
+      "candidate_intervention": {
+        "parameter": "M",
+        "direction": "decrease"
+      },
+      "evidence": {
+        "pair_support": 8,
+        "seed_support": 7,
+        "workload_support": 3,
+        "task_support": 2,
+        "successes": 4,
+        "success_rate": 0.5,
+        "mean_effect": 0.95341,
+        "effect_ci95": [
+          0.82575,
+          1.06374
+        ],
+        "confidence": 0.0988,
+        "posterior_mean": 0.5
+      },
+      "status": "insufficient_evidence",
+      "reasons": [
+        "pair_support 8 < 20",
+        "P(p > 0.7) = 0.0988 < 0.9",
+        "disappears when one workload is left out",
+        "disappears when one seed is left out",
+        "success rate unstable under bootstrap"
+      ]
+    },
+    {
+      "policy_id": "P3",
+      "branch": "qps_improvement",
+      "symptom": {
+        "expansion_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "visit_node_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "dist_comp_cnt": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "traversal_effectiveness": [
+          "low",
+          "lower-middle"
+        ],
+        "recall_state": [
+          "close_above"
+        ]
+      },
+      "diagnosis": "Recall clears the threshold only because traversal volume is high while navigation efficiency is poor: the margin is bought with brute-force width, so cutting effort is likely to violate the threshold.",
+      "candidate_intervention": {
+        "parameter": "ef_construction",
+        "direction": "decrease"
+      },
+      "evidence": {
+        "pair_support": 2,
+        "seed_support": 2,
+        "workload_support": 1,
+        "task_support": 1,
+        "successes": 0,
+        "success_rate": 0.0,
+        "mean_effect": 0.1038,
+        "effect_ci95": [
+          0.01369,
+          0.19391
+        ],
+        "confidence": 0.027,
+        "posterior_mean": 0.25
+      },
+      "status": "insufficient_evidence",
+      "reasons": [
+        "pair_support 2 < 20",
+        "workload_support 1 < 3",
+        "P(p > 0.7) = 0.027 < 0.9",
+        "disappears when one seed is left out"
+      ]
+    },
+    {
+      "policy_id": "P4",
+      "branch": "recall_recovery",
+      "symptom": {
+        "expansion_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "visit_node_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "dist_comp_cnt": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "traversal_effectiveness": [
+          "low",
+          "lower-middle"
+        ],
+        "recall_state": [
+          "close_below",
+          "far_below"
+        ]
+      },
+      "diagnosis": "Traversal volume is high, but a large fraction of expansions fail to insert closer candidates: the graph's local connectivity does not route queries toward their neighborhoods, so additional search effort does not convert into recall (which stays below the target).",
+      "intervention": {
+        "parameter": "ef_construction",
+        "direction": "increase"
+      },
+      "evidence": {
+        "pair_support": 131,
+        "seed_support": 41,
+        "workload_support": 12,
+        "task_support": 3,
+        "successes": 129,
+        "success_rate": 0.9847,
+        "mean_effect": 0.05658,
+        "effect_ci95": [
+          0.05371,
+          0.05961
+        ],
+        "confidence": 1.0,
+        "posterior_mean": 0.9774,
+        "robustness": {
+          "loo_workload_flag": false,
+          "loo_seed_flag": false,
+          "bootstrap_unstable": false
+        }
+      },
+      "status": "accepted",
+      "selection": "selected"
+    },
+    {
+      "policy_id": "P5",
+      "branch": "recall_recovery",
+      "symptom": {
+        "expansion_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "visit_node_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "dist_comp_cnt": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "traversal_effectiveness": [
+          "low",
+          "lower-middle"
+        ],
+        "recall_state": [
+          "close_below",
+          "far_below"
+        ]
+      },
+      "diagnosis": "Traversal volume is high, but a large fraction of expansions fail to insert closer candidates: the graph's local connectivity does not route queries toward their neighborhoods, so additional search effort does not convert into recall (which stays below the target).",
+      "candidate_intervention": {
+        "parameter": "M",
+        "direction": "increase"
+      },
+      "evidence": {
+        "pair_support": 217,
+        "seed_support": 42,
+        "workload_support": 12,
+        "task_support": 3,
+        "successes": 149,
+        "success_rate": 0.6866,
+        "mean_effect": 0.01875,
+        "effect_ci95": [
+          0.01633,
+          0.02143
+        ],
+        "confidence": 0.3207,
+        "posterior_mean": 0.6849
+      },
+      "status": "insufficient_evidence",
+      "reasons": [
+        "P(p > 0.7) = 0.3207 < 0.9",
+        "disappears when one workload is left out",
+        "disappears when one seed is left out"
+      ]
+    },
+    {
+      "policy_id": "P6",
+      "branch": "recall_recovery",
+      "symptom": {
+        "expansion_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "visit_node_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "dist_comp_cnt": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "traversal_effectiveness": [
+          "low",
+          "lower-middle"
+        ],
+        "recall_state": [
+          "close_below",
+          "far_below"
+        ]
+      },
+      "diagnosis": "Traversal volume is high, but a large fraction of expansions fail to insert closer candidates: the graph's local connectivity does not route queries toward their neighborhoods, so additional search effort does not convert into recall (which stays below the target).",
+      "candidate_intervention": {
+        "parameter": "ef",
+        "direction": "increase"
+      },
+      "evidence": {
+        "pair_support": 302,
+        "seed_support": 42,
+        "workload_support": 12,
+        "task_support": 3,
+        "successes": 143,
+        "success_rate": 0.4735,
+        "mean_effect": 0.00958,
+        "effect_ci95": [
+          0.00633,
+          0.01278
+        ],
+        "confidence": 0.0,
+        "posterior_mean": 0.4737
+      },
+      "status": "rejected",
+      "reasons": [
+        "P(p > 0.7) = 0.0 < 0.9",
+        "disappears when one workload is left out",
+        "disappears when one seed is left out"
+      ]
+    },
+    {
+      "policy_id": "P7",
+      "branch": "recall_recovery",
+      "symptom": {
+        "expansion_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "visit_node_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "dist_comp_cnt": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "traversal_effectiveness": [
+          "low",
+          "lower-middle"
+        ],
+        "recall_state": [
+          "close_below",
+          "far_below"
+        ]
+      },
+      "diagnosis": "Traversal volume is high, but a large fraction of expansions fail to insert closer candidates: the graph's local connectivity does not route queries toward their neighborhoods, so additional search effort does not convert into recall (which stays below the target).",
+      "candidate_intervention": {
+        "parameter": "ef",
+        "direction": "decrease"
+      },
+      "evidence": {
+        "pair_support": 541,
+        "seed_support": 44,
+        "workload_support": 12,
+        "task_support": 3,
+        "successes": 103,
+        "success_rate": 0.1904,
+        "mean_effect": -0.02398,
+        "effect_ci95": [
+          -0.02821,
+          -0.01965
+        ],
+        "confidence": 0.0,
+        "posterior_mean": 0.1915
+      },
+      "status": "rejected",
+      "reasons": [
+        "P(p > 0.7) = 0.0 < 0.9",
+        "disappears when one workload is left out",
+        "disappears when one seed is left out"
+      ]
+    },
+    {
+      "policy_id": "P8",
+      "branch": "qps_improvement",
+      "symptom": {
+        "expansion_cnt": [
+          "high",
+          "lower-middle",
+          "middle",
+          "upper-middle"
+        ],
+        "visit_node_cnt": [
+          "high",
+          "lower-middle",
+          "middle",
+          "upper-middle"
+        ],
+        "dist_comp_cnt": [
+          "low",
+          "lower-middle",
+          "middle"
+        ],
+        "traversal_effectiveness": [
+          "high",
+          "low",
+          "lower-middle",
+          "middle",
+          "upper-middle"
+        ],
+        "recall_state": [
+          "close_above",
+          "close_below",
+          "far_above",
+          "far_below"
+        ]
+      },
+      "diagnosis": "Distance computations sit far below the expansion/visit volume: each expansion inspects an unusually narrow neighborhood (small graph degree relative to the task's history), so traversal volume is bought cheaply. The dominant lever is graph degree rather than search width.",
+      "candidate_intervention": {
+        "parameter": "M",
+        "direction": "increase"
+      },
+      "evidence": {
+        "pair_support": 2,
+        "seed_support": 2,
+        "workload_support": 2,
+        "task_support": 1,
+        "successes": 0,
+        "success_rate": 0.0,
+        "mean_effect": -0.40064,
+        "effect_ci95": [
+          -0.40739,
+          -0.39389
+        ],
+        "confidence": 0.027,
+        "posterior_mean": 0.25
+      },
+      "status": "insufficient_evidence",
+      "reasons": [
+        "pair_support 2 < 20",
+        "workload_support 2 < 3",
+        "P(p > 0.7) = 0.027 < 0.9",
+        "disappears when one workload is left out",
+        "disappears when one seed is left out"
+      ]
+    },
+    {
+      "policy_id": "P9",
+      "branch": "qps_improvement",
+      "symptom": {
+        "expansion_cnt": [
+          "high",
+          "lower-middle",
+          "middle",
+          "upper-middle"
+        ],
+        "visit_node_cnt": [
+          "high",
+          "lower-middle",
+          "middle",
+          "upper-middle"
+        ],
+        "dist_comp_cnt": [
+          "low",
+          "lower-middle",
+          "middle"
+        ],
+        "traversal_effectiveness": [
+          "high",
+          "low",
+          "lower-middle",
+          "middle",
+          "upper-middle"
+        ],
+        "recall_state": [
+          "close_above",
+          "close_below",
+          "far_above",
+          "far_below"
+        ]
+      },
+      "diagnosis": "Distance computations sit far below the expansion/visit volume: each expansion inspects an unusually narrow neighborhood (small graph degree relative to the task's history), so traversal volume is bought cheaply. The dominant lever is graph degree rather than search width.",
+      "candidate_intervention": {
+        "parameter": "ef",
+        "direction": "increase"
+      },
+      "evidence": {
+        "pair_support": 2,
+        "seed_support": 2,
+        "workload_support": 2,
+        "task_support": 1,
+        "successes": 0,
+        "success_rate": 0.0,
+        "mean_effect": -0.52621,
+        "effect_ci95": [
+          -0.53702,
+          -0.51541
+        ],
+        "confidence": 0.027,
+        "posterior_mean": 0.25
+      },
+      "status": "insufficient_evidence",
+      "reasons": [
+        "pair_support 2 < 20",
+        "workload_support 2 < 3",
+        "P(p > 0.7) = 0.027 < 0.9",
+        "disappears when one workload is left out",
+        "disappears when one seed is left out"
+      ]
+    },
+    {
+      "policy_id": "P10",
+      "branch": "qps_improvement",
+      "symptom": {
+        "expansion_cnt": [
+          "high",
+          "lower-middle",
+          "middle",
+          "upper-middle"
+        ],
+        "visit_node_cnt": [
+          "high",
+          "lower-middle",
+          "middle",
+          "upper-middle"
+        ],
+        "dist_comp_cnt": [
+          "low",
+          "lower-middle",
+          "middle"
+        ],
+        "traversal_effectiveness": [
+          "high",
+          "low",
+          "lower-middle",
+          "middle",
+          "upper-middle"
+        ],
+        "recall_state": [
+          "close_above",
+          "close_below",
+          "far_above",
+          "far_below"
+        ]
+      },
+      "diagnosis": "Distance computations sit far below the expansion/visit volume: each expansion inspects an unusually narrow neighborhood (small graph degree relative to the task's history), so traversal volume is bought cheaply. The dominant lever is graph degree rather than search width.",
+      "candidate_intervention": {
+        "parameter": "ef_construction",
+        "direction": "increase"
+      },
+      "evidence": {
+        "pair_support": 1,
+        "seed_support": 1,
+        "workload_support": 1,
+        "task_support": 1,
+        "successes": 0,
+        "success_rate": 0.0,
+        "mean_effect": -0.18824,
+        "effect_ci95": [
+          -0.18824,
+          -0.18824
+        ],
+        "confidence": 0.09,
+        "posterior_mean": 0.3333
+      },
+      "status": "insufficient_evidence",
+      "reasons": [
+        "pair_support 1 < 20",
+        "seed_support 1 < 2",
+        "workload_support 1 < 3",
+        "P(p > 0.7) = 0.09 < 0.9"
+      ]
+    },
+    {
+      "policy_id": "P11",
+      "branch": "recall_recovery",
+      "symptom": {
+        "expansion_cnt": [
+          "high",
+          "lower-middle",
+          "middle",
+          "upper-middle"
+        ],
+        "visit_node_cnt": [
+          "high",
+          "lower-middle",
+          "middle",
+          "upper-middle"
+        ],
+        "dist_comp_cnt": [
+          "low",
+          "lower-middle",
+          "middle"
+        ],
+        "traversal_effectiveness": [
+          "high",
+          "low",
+          "lower-middle",
+          "middle",
+          "upper-middle"
+        ],
+        "recall_state": [
+          "close_above",
+          "close_below",
+          "far_above",
+          "far_below"
+        ]
+      },
+      "diagnosis": "Distance computations sit far below the expansion/visit volume: each expansion inspects an unusually narrow neighborhood (small graph degree relative to the task's history), so traversal volume is bought cheaply. The dominant lever is graph degree rather than search width.",
+      "candidate_intervention": {
+        "parameter": "M",
+        "direction": "increase"
+      },
+      "evidence": {
+        "pair_support": 8,
+        "seed_support": 7,
+        "workload_support": 4,
+        "task_support": 3,
+        "successes": 6,
+        "success_rate": 0.75,
+        "mean_effect": 0.02666,
+        "effect_ci95": [
+          0.01183,
+          0.03902
+        ],
+        "confidence": 0.5372,
+        "posterior_mean": 0.7
+      },
+      "status": "insufficient_evidence",
+      "reasons": [
+        "pair_support 8 < 20",
+        "P(p > 0.7) = 0.5372 < 0.9",
+        "success rate unstable under bootstrap"
+      ]
+    },
+    {
+      "policy_id": "P12",
+      "branch": "recall_recovery",
+      "symptom": {
+        "expansion_cnt": [
+          "high",
+          "lower-middle",
+          "middle",
+          "upper-middle"
+        ],
+        "visit_node_cnt": [
+          "high",
+          "lower-middle",
+          "middle",
+          "upper-middle"
+        ],
+        "dist_comp_cnt": [
+          "low",
+          "lower-middle",
+          "middle"
+        ],
+        "traversal_effectiveness": [
+          "high",
+          "low",
+          "lower-middle",
+          "middle",
+          "upper-middle"
+        ],
+        "recall_state": [
+          "close_above",
+          "close_below",
+          "far_above",
+          "far_below"
+        ]
+      },
+      "diagnosis": "Distance computations sit far below the expansion/visit volume: each expansion inspects an unusually narrow neighborhood (small graph degree relative to the task's history), so traversal volume is bought cheaply. The dominant lever is graph degree rather than search width.",
+      "intervention": {
+        "parameter": "ef",
+        "direction": "increase"
+      },
+      "evidence": {
+        "pair_support": 38,
+        "seed_support": 24,
+        "workload_support": 8,
+        "task_support": 3,
+        "successes": 35,
+        "success_rate": 0.9211,
+        "mean_effect": 0.15672,
+        "effect_ci95": [
+          0.13239,
+          0.17942
+        ],
+        "confidence": 0.9992,
+        "posterior_mean": 0.9,
+        "robustness": {
+          "loo_workload_flag": false,
+          "loo_seed_flag": false,
+          "bootstrap_unstable": false
+        }
+      },
+      "status": "accepted",
+      "selection": "selected"
+    },
+    {
+      "policy_id": "P13",
+      "branch": "recall_recovery",
+      "symptom": {
+        "expansion_cnt": [
+          "high",
+          "lower-middle",
+          "middle",
+          "upper-middle"
+        ],
+        "visit_node_cnt": [
+          "high",
+          "lower-middle",
+          "middle",
+          "upper-middle"
+        ],
+        "dist_comp_cnt": [
+          "low",
+          "lower-middle",
+          "middle"
+        ],
+        "traversal_effectiveness": [
+          "high",
+          "low",
+          "lower-middle",
+          "middle",
+          "upper-middle"
+        ],
+        "recall_state": [
+          "close_above",
+          "close_below",
+          "far_above",
+          "far_below"
+        ]
+      },
+      "diagnosis": "Distance computations sit far below the expansion/visit volume: each expansion inspects an unusually narrow neighborhood (small graph degree relative to the task's history), so traversal volume is bought cheaply. The dominant lever is graph degree rather than search width.",
+      "candidate_intervention": {
+        "parameter": "ef_construction",
+        "direction": "increase"
+      },
+      "evidence": {
+        "pair_support": 7,
+        "seed_support": 7,
+        "workload_support": 4,
+        "task_support": 3,
+        "successes": 7,
+        "success_rate": 1.0,
+        "mean_effect": 0.06313,
+        "effect_ci95": [
+          0.04946,
+          0.0718
+        ],
+        "confidence": 0.9424,
+        "posterior_mean": 0.8889
+      },
+      "status": "insufficient_evidence",
+      "reasons": [
+        "pair_support 7 < 20"
+      ]
+    },
+    {
+      "policy_id": "P14",
+      "branch": "qps_improvement",
+      "symptom": {
+        "expansion_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "visit_node_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "dist_comp_cnt": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "traversal_effectiveness": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "recall_state": [
+          "far_above"
+        ]
+      },
+      "diagnosis": "Traversal is extensive and productive, yet recall is far above the target: the search does substantially more work than the threshold requires, and the surplus volume can be traded for QPS.",
+      "intervention": {
+        "parameter": "ef",
+        "direction": "decrease"
+      },
+      "evidence": {
+        "pair_support": 42,
+        "seed_support": 12,
+        "workload_support": 5,
+        "task_support": 3,
+        "successes": 36,
+        "success_rate": 0.8571,
+        "mean_effect": 0.92917,
+        "effect_ci95": [
+          0.88337,
+          0.98679
+        ],
+        "confidence": 0.9875,
+        "posterior_mean": 0.8409,
+        "robustness": {
+          "loo_workload_flag": false,
+          "loo_seed_flag": false,
+          "bootstrap_unstable": false
+        }
+      },
+      "status": "accepted",
+      "selection": "unresolved"
+    },
+    {
+      "policy_id": "P15",
+      "branch": "qps_improvement",
+      "symptom": {
+        "expansion_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "visit_node_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "dist_comp_cnt": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "traversal_effectiveness": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "recall_state": [
+          "far_above"
+        ]
+      },
+      "diagnosis": "Traversal is extensive and productive, yet recall is far above the target: the search does substantially more work than the threshold requires, and the surplus volume can be traded for QPS.",
+      "intervention": {
+        "parameter": "M",
+        "direction": "decrease"
+      },
+      "evidence": {
+        "pair_support": 28,
+        "seed_support": 9,
+        "workload_support": 3,
+        "task_support": 2,
+        "successes": 28,
+        "success_rate": 1.0,
+        "mean_effect": 0.92837,
+        "effect_ci95": [
+          0.87296,
+          0.97535
+        ],
+        "confidence": 1.0,
+        "posterior_mean": 0.9667,
+        "robustness": {
+          "loo_workload_flag": false,
+          "loo_seed_flag": false,
+          "bootstrap_unstable": false
+        }
+      },
+      "status": "accepted",
+      "selection": "unresolved"
+    },
+    {
+      "policy_id": "P16",
+      "branch": "qps_improvement",
+      "symptom": {
+        "expansion_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "visit_node_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "dist_comp_cnt": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "traversal_effectiveness": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "recall_state": [
+          "far_above"
+        ]
+      },
+      "diagnosis": "Traversal is extensive and productive, yet recall is far above the target: the search does substantially more work than the threshold requires, and the surplus volume can be traded for QPS.",
+      "candidate_intervention": {
+        "parameter": "ef",
+        "direction": "increase"
+      },
+      "evidence": {
+        "pair_support": 40,
+        "seed_support": 12,
+        "workload_support": 5,
+        "task_support": 3,
+        "successes": 0,
+        "success_rate": 0.0,
+        "mean_effect": -0.49209,
+        "effect_ci95": [
+          -0.50541,
+          -0.48045
+        ],
+        "confidence": 0.0,
+        "posterior_mean": 0.0238
+      },
+      "status": "rejected",
+      "reasons": [
+        "P(p > 0.7) = 0.0 < 0.9",
+        "disappears when one workload is left out",
+        "disappears when one seed is left out"
+      ]
+    },
+    {
+      "policy_id": "P17",
+      "branch": "recall_recovery",
+      "symptom": {
+        "expansion_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "visit_node_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "dist_comp_cnt": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "traversal_effectiveness": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "recall_state": [
+          "close_below",
+          "far_below"
+        ]
+      },
+      "diagnosis": "Even high, productive traversal volume cannot push recall to the target: the graph itself caps achievable recall (missing links / low build quality), so more search width cannot help — the fix is graph quality, not ef.",
+      "candidate_intervention": {
+        "parameter": "ef_construction",
+        "direction": "increase"
+      },
+      "evidence": {
+        "pair_support": 19,
+        "seed_support": 17,
+        "workload_support": 7,
+        "task_support": 3,
+        "successes": 19,
+        "success_rate": 1.0,
+        "mean_effect": 0.05666,
+        "effect_ci95": [
+          0.05021,
+          0.06335
+        ],
+        "confidence": 0.9992,
+        "posterior_mean": 0.9524
+      },
+      "status": "insufficient_evidence",
+      "reasons": [
+        "pair_support 19 < 20"
+      ]
+    },
+    {
+      "policy_id": "P18",
+      "branch": "recall_recovery",
+      "symptom": {
+        "expansion_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "visit_node_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "dist_comp_cnt": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "traversal_effectiveness": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "recall_state": [
+          "close_below",
+          "far_below"
+        ]
+      },
+      "diagnosis": "Even high, productive traversal volume cannot push recall to the target: the graph itself caps achievable recall (missing links / low build quality), so more search width cannot help — the fix is graph quality, not ef.",
+      "candidate_intervention": {
+        "parameter": "M",
+        "direction": "increase"
+      },
+      "evidence": {
+        "pair_support": 35,
+        "seed_support": 22,
+        "workload_support": 8,
+        "task_support": 3,
+        "successes": 24,
+        "success_rate": 0.6857,
+        "mean_effect": 0.02276,
+        "effect_ci95": [
+          0.0137,
+          0.03169
+        ],
+        "confidence": 0.3909,
+        "posterior_mean": 0.6757
+      },
+      "status": "insufficient_evidence",
+      "reasons": [
+        "P(p > 0.7) = 0.3909 < 0.9",
+        "disappears when one workload is left out",
+        "disappears when one seed is left out"
+      ]
+    },
+    {
+      "policy_id": "P19",
+      "branch": "recall_recovery",
+      "symptom": {
+        "expansion_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "visit_node_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "dist_comp_cnt": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "traversal_effectiveness": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "recall_state": [
+          "close_below",
+          "far_below"
+        ]
+      },
+      "diagnosis": "Even high, productive traversal volume cannot push recall to the target: the graph itself caps achievable recall (missing links / low build quality), so more search width cannot help — the fix is graph quality, not ef.",
+      "candidate_intervention": {
+        "parameter": "ef",
+        "direction": "increase"
+      },
+      "evidence": {
+        "pair_support": 53,
+        "seed_support": 25,
+        "workload_support": 8,
+        "task_support": 3,
+        "successes": 35,
+        "success_rate": 0.6604,
+        "mean_effect": 0.01898,
+        "effect_ci95": [
+          0.01387,
+          0.02478
+        ],
+        "confidence": 0.2441,
+        "posterior_mean": 0.6545
+      },
+      "status": "insufficient_evidence",
+      "reasons": [
+        "P(p > 0.7) = 0.2441 < 0.9",
+        "disappears when one workload is left out",
+        "disappears when one seed is left out"
+      ]
+    },
+    {
+      "policy_id": "P20",
+      "branch": "qps_improvement",
+      "symptom": {
+        "expansion_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "visit_node_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "dist_comp_cnt": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "traversal_effectiveness": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "recall_state": [
+          "close_above"
+        ]
+      },
+      "diagnosis": "Traversal is extensive and productive, yet recall only just meets the target: the task genuinely requires this much effort. QPS can only be improved by making the graph more navigable (same recall at lower width), not by cutting width blindly.",
+      "candidate_intervention": {
+        "parameter": "ef_construction",
+        "direction": "increase"
+      },
+      "evidence": {
+        "pair_support": 4,
+        "seed_support": 4,
+        "workload_support": 2,
+        "task_support": 1,
+        "successes": 1,
+        "success_rate": 0.25,
+        "mean_effect": -0.07983,
+        "effect_ci95": [
+          -0.1781,
+          0.02796
+        ],
+        "confidence": 0.0308,
+        "posterior_mean": 0.3333
+      },
+      "status": "insufficient_evidence",
+      "reasons": [
+        "pair_support 4 < 20",
+        "workload_support 2 < 3",
+        "P(p > 0.7) = 0.0308 < 0.9",
+        "disappears when one workload is left out",
+        "disappears when one seed is left out",
+        "success rate unstable under bootstrap"
+      ]
+    },
+    {
+      "policy_id": "P21",
+      "branch": "qps_improvement",
+      "symptom": {
+        "expansion_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "visit_node_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "dist_comp_cnt": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "traversal_effectiveness": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "recall_state": [
+          "close_above"
+        ]
+      },
+      "diagnosis": "Traversal is extensive and productive, yet recall only just meets the target: the task genuinely requires this much effort. QPS can only be improved by making the graph more navigable (same recall at lower width), not by cutting width blindly.",
+      "candidate_intervention": {
+        "parameter": "M",
+        "direction": "increase"
+      },
+      "evidence": {
+        "pair_support": 2,
+        "seed_support": 2,
+        "workload_support": 2,
+        "task_support": 1,
+        "successes": 0,
+        "success_rate": 0.0,
+        "mean_effect": -0.3982,
+        "effect_ci95": [
+          -0.43898,
+          -0.35741
+        ],
+        "confidence": 0.027,
+        "posterior_mean": 0.25
+      },
+      "status": "insufficient_evidence",
+      "reasons": [
+        "pair_support 2 < 20",
+        "workload_support 2 < 3",
+        "P(p > 0.7) = 0.027 < 0.9",
+        "disappears when one workload is left out",
+        "disappears when one seed is left out"
+      ]
+    },
+    {
+      "policy_id": "P22",
+      "branch": "qps_improvement",
+      "symptom": {
+        "expansion_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "visit_node_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "dist_comp_cnt": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "traversal_effectiveness": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "recall_state": [
+          "close_above"
+        ]
+      },
+      "diagnosis": "Traversal is extensive and productive, yet recall only just meets the target: the task genuinely requires this much effort. QPS can only be improved by making the graph more navigable (same recall at lower width), not by cutting width blindly.",
+      "candidate_intervention": {
+        "parameter": "ef",
+        "direction": "decrease"
+      },
+      "evidence": {
+        "pair_support": 4,
+        "seed_support": 4,
+        "workload_support": 2,
+        "task_support": 1,
+        "successes": 1,
+        "success_rate": 0.25,
+        "mean_effect": 1.15957,
+        "effect_ci95": [
+          1.10618,
+          1.21712
+        ],
+        "confidence": 0.0308,
+        "posterior_mean": 0.3333
+      },
+      "status": "insufficient_evidence",
+      "reasons": [
+        "pair_support 4 < 20",
+        "workload_support 2 < 3",
+        "P(p > 0.7) = 0.0308 < 0.9",
+        "disappears when one workload is left out",
+        "disappears when one seed is left out",
+        "success rate unstable under bootstrap"
+      ]
+    },
+    {
+      "policy_id": "P23",
+      "branch": "qps_improvement",
+      "symptom": {
+        "expansion_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "visit_node_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "dist_comp_cnt": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "traversal_effectiveness": [
+          "low",
+          "lower-middle"
+        ],
+        "recall_state": [
+          "far_above"
+        ]
+      },
+      "diagnosis": "Recall is far above the target while expansions are largely unproductive: the workload neither needs this volume nor gets recall from it, so much of the traversal is redundant.",
+      "intervention": {
+        "parameter": "ef",
+        "direction": "decrease"
+      },
+      "evidence": {
+        "pair_support": 349,
+        "seed_support": 41,
+        "workload_support": 12,
+        "task_support": 3,
+        "successes": 284,
+        "success_rate": 0.8138,
+        "mean_effect": 0.99834,
+        "effect_ci95": [
+          0.97541,
+          1.01948
+        ],
+        "confidence": 1.0,
+        "posterior_mean": 0.812,
+        "robustness": {
+          "loo_workload_flag": false,
+          "loo_seed_flag": false,
+          "bootstrap_unstable": false
+        }
+      },
+      "status": "accepted",
+      "selection": "unresolved"
+    },
+    {
+      "policy_id": "P24",
+      "branch": "qps_improvement",
+      "symptom": {
+        "expansion_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "visit_node_cnt": [
+          "high",
+          "upper-middle"
+        ],
+        "dist_comp_cnt": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "traversal_effectiveness": [
+          "low",
+          "lower-middle"
+        ],
+        "recall_state": [
+          "far_above"
+        ]
+      },
+      "diagnosis": "Recall is far above the target while expansions are largely unproductive: the workload neither needs this volume nor gets recall from it, so much of the traversal is redundant.",
+      "intervention": {
+        "parameter": "M",
+        "direction": "decrease"
+      },
+      "evidence": {
+        "pair_support": 150,
+        "seed_support": 33,
+        "workload_support": 12,
+        "task_support": 3,
+        "successes": 116,
+        "success_rate": 0.7733,
+        "mean_effect": 0.9664,
+        "effect_ci95": [
+          0.93677,
+          0.99159
+        ],
+        "confidence": 0.9747,
+        "posterior_mean": 0.7697,
+        "robustness": {
+          "loo_workload_flag": false,
+          "loo_seed_flag": false,
+          "bootstrap_unstable": false
+        }
+      },
+      "status": "accepted",
+      "selection": "unresolved"
+    },
+    {
+      "policy_id": "P25",
+      "branch": "recall_recovery",
+      "symptom": {
+        "expansion_cnt": [
+          "low",
+          "lower-middle"
+        ],
+        "visit_node_cnt": [
+          "low",
+          "lower-middle"
+        ],
+        "dist_comp_cnt": [
+          "low",
+          "lower-middle",
+          "middle"
+        ],
+        "traversal_effectiveness": [
+          "low",
+          "lower-middle"
+        ],
+        "recall_state": [
+          "close_below",
+          "far_below"
+        ]
+      },
+      "diagnosis": "Few expansions occur and even those rarely improve the candidate list, with recall below the target: the search appears stuck (pathological entry point or degenerate local connectivity at very low width).",
+      "candidate_intervention": {
+        "parameter": "ef",
+        "direction": "increase"
+      },
+      "evidence": {
+        "pair_support": 3,
+        "seed_support": 3,
+        "workload_support": 3,
+        "task_support": 3,
+        "successes": 3,
+        "success_rate": 1.0,
+        "mean_effect": 0.22148,
+        "effect_ci95": [
+          0.21122,
+          0.23405
+        ],
+        "confidence": 0.7599,
+        "posterior_mean": 0.8
+      },
+      "status": "insufficient_evidence",
+      "reasons": [
+        "pair_support 3 < 20",
+        "P(p > 0.7) = 0.7599 < 0.9"
+      ]
+    },
+    {
+      "policy_id": "P26",
+      "branch": "recall_recovery",
+      "symptom": {
+        "expansion_cnt": [
+          "low",
+          "lower-middle"
+        ],
+        "visit_node_cnt": [
+          "low",
+          "lower-middle"
+        ],
+        "dist_comp_cnt": [
+          "low",
+          "lower-middle",
+          "middle"
+        ],
+        "traversal_effectiveness": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "recall_state": [
+          "close_below",
+          "far_below"
+        ]
+      },
+      "diagnosis": "The search expands too few nodes. Traversal is reasonably productive when performed, but the total traversal volume is insufficient to recover the required neighbors, so recall sits below the target.",
+      "intervention": {
+        "parameter": "ef",
+        "direction": "increase"
+      },
+      "evidence": {
+        "pair_support": 1108,
+        "seed_support": 48,
+        "workload_support": 12,
+        "task_support": 3,
+        "successes": 1108,
+        "success_rate": 1.0,
+        "mean_effect": 0.19928,
+        "effect_ci95": [
+          0.19688,
+          0.20193
+        ],
+        "confidence": 1.0,
+        "posterior_mean": 0.9991,
+        "robustness": {
+          "loo_workload_flag": false,
+          "loo_seed_flag": false,
+          "bootstrap_unstable": false
+        }
+      },
+      "status": "accepted",
+      "selection": "selected"
+    },
+    {
+      "policy_id": "P27",
+      "branch": "recall_recovery",
+      "symptom": {
+        "expansion_cnt": [
+          "low",
+          "lower-middle"
+        ],
+        "visit_node_cnt": [
+          "low",
+          "lower-middle"
+        ],
+        "dist_comp_cnt": [
+          "low",
+          "lower-middle",
+          "middle"
+        ],
+        "traversal_effectiveness": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "recall_state": [
+          "close_below",
+          "far_below"
+        ]
+      },
+      "diagnosis": "The search expands too few nodes. Traversal is reasonably productive when performed, but the total traversal volume is insufficient to recover the required neighbors, so recall sits below the target.",
+      "candidate_intervention": {
+        "parameter": "ef",
+        "direction": "decrease"
+      },
+      "evidence": {
+        "pair_support": 687,
+        "seed_support": 48,
+        "workload_support": 12,
+        "task_support": 3,
+        "successes": 0,
+        "success_rate": 0.0,
+        "mean_effect": -0.20476,
+        "effect_ci95": [
+          -0.20719,
+          -0.20164
+        ],
+        "confidence": 0.0,
+        "posterior_mean": 0.0015
+      },
+      "status": "rejected",
+      "reasons": [
+        "P(p > 0.7) = 0.0 < 0.9",
+        "disappears when one workload is left out",
+        "disappears when one seed is left out"
+      ]
+    },
+    {
+      "policy_id": "P28",
+      "branch": "qps_improvement",
+      "symptom": {
+        "expansion_cnt": [
+          "low",
+          "lower-middle",
+          "middle"
+        ],
+        "visit_node_cnt": [
+          "low",
+          "lower-middle",
+          "middle"
+        ],
+        "dist_comp_cnt": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "traversal_effectiveness": [
+          "high",
+          "low",
+          "lower-middle",
+          "middle",
+          "upper-middle"
+        ],
+        "recall_state": [
+          "close_above",
+          "close_below",
+          "far_above",
+          "far_below"
+        ]
+      },
+      "diagnosis": "Distance computations far exceed the expansion/visit volume: each expansion inspects a very wide neighborhood (high graph degree), so per-expansion cost dominates. The dominant lever is graph degree rather than search width.",
+      "candidate_intervention": {
+        "parameter": "M",
+        "direction": "decrease"
+      },
+      "evidence": {
+        "pair_support": 3,
+        "seed_support": 3,
+        "workload_support": 2,
+        "task_support": 2,
+        "successes": 3,
+        "success_rate": 1.0,
+        "mean_effect": 0.94182,
+        "effect_ci95": [
+          0.84816,
+          1.00487
+        ],
+        "confidence": 0.7599,
+        "posterior_mean": 0.8
+      },
+      "status": "insufficient_evidence",
+      "reasons": [
+        "pair_support 3 < 20",
+        "workload_support 2 < 3",
+        "P(p > 0.7) = 0.7599 < 0.9"
+      ]
+    },
+    {
+      "policy_id": "P29",
+      "branch": "qps_improvement",
+      "symptom": {
+        "expansion_cnt": [
+          "low",
+          "lower-middle",
+          "middle"
+        ],
+        "visit_node_cnt": [
+          "low",
+          "lower-middle",
+          "middle"
+        ],
+        "dist_comp_cnt": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "traversal_effectiveness": [
+          "high",
+          "low",
+          "lower-middle",
+          "middle",
+          "upper-middle"
+        ],
+        "recall_state": [
+          "close_above",
+          "close_below",
+          "far_above",
+          "far_below"
+        ]
+      },
+      "diagnosis": "Distance computations far exceed the expansion/visit volume: each expansion inspects a very wide neighborhood (high graph degree), so per-expansion cost dominates. The dominant lever is graph degree rather than search width.",
+      "candidate_intervention": {
+        "parameter": "ef_construction",
+        "direction": "decrease"
+      },
+      "evidence": {
+        "pair_support": 2,
+        "seed_support": 2,
+        "workload_support": 1,
+        "task_support": 1,
+        "successes": 2,
+        "success_rate": 1.0,
+        "mean_effect": 0.27717,
+        "effect_ci95": [
+          0.25082,
+          0.30351
+        ],
+        "confidence": 0.657,
+        "posterior_mean": 0.75
+      },
+      "status": "insufficient_evidence",
+      "reasons": [
+        "pair_support 2 < 20",
+        "workload_support 1 < 3",
+        "P(p > 0.7) = 0.657 < 0.9"
+      ]
+    },
+    {
+      "policy_id": "P30",
+      "branch": "qps_improvement",
+      "symptom": {
+        "expansion_cnt": [
+          "low",
+          "lower-middle",
+          "middle"
+        ],
+        "visit_node_cnt": [
+          "low",
+          "lower-middle",
+          "middle"
+        ],
+        "dist_comp_cnt": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "traversal_effectiveness": [
+          "high",
+          "low",
+          "lower-middle",
+          "middle",
+          "upper-middle"
+        ],
+        "recall_state": [
+          "close_above",
+          "close_below",
+          "far_above",
+          "far_below"
+        ]
+      },
+      "diagnosis": "Distance computations far exceed the expansion/visit volume: each expansion inspects a very wide neighborhood (high graph degree), so per-expansion cost dominates. The dominant lever is graph degree rather than search width.",
+      "candidate_intervention": {
+        "parameter": "ef",
+        "direction": "increase"
+      },
+      "evidence": {
+        "pair_support": 3,
+        "seed_support": 3,
+        "workload_support": 2,
+        "task_support": 2,
+        "successes": 0,
+        "success_rate": 0.0,
+        "mean_effect": -0.47369,
+        "effect_ci95": [
+          -0.52524,
+          -0.41911
+        ],
+        "confidence": 0.0081,
+        "posterior_mean": 0.2
+      },
+      "status": "insufficient_evidence",
+      "reasons": [
+        "pair_support 3 < 20",
+        "workload_support 2 < 3",
+        "P(p > 0.7) = 0.0081 < 0.9",
+        "disappears when one workload is left out",
+        "disappears when one seed is left out"
+      ]
+    },
+    {
+      "policy_id": "P31",
+      "branch": "recall_recovery",
+      "symptom": {
+        "expansion_cnt": [
+          "low",
+          "lower-middle",
+          "middle"
+        ],
+        "visit_node_cnt": [
+          "low",
+          "lower-middle",
+          "middle"
+        ],
+        "dist_comp_cnt": [
+          "high",
+          "middle",
+          "upper-middle"
+        ],
+        "traversal_effectiveness": [
+          "high",
+          "low",
+          "lower-middle",
+          "middle",
+          "upper-middle"
+        ],
+        "recall_state": [
+          "close_above",
+          "close_below",
+          "far_above",
+          "far_below"
+        ]
+      },
+      "diagnosis": "Distance computations far exceed the expansion/visit volume: each expansion inspects a very wide neighborhood (high graph degree), so per-expansion cost dominates. The dominant lever is graph degree rather than search width.",
+      "candidate_intervention": {
+        "parameter": "ef",
+        "direction": "increase"
+      },
+      "evidence": {
+        "pair_support": 6,
+        "seed_support": 5,
+        "workload_support": 5,
+        "task_support": 3,
+        "successes": 6,
+        "success_rate": 1.0,
+        "mean_effect": 0.23304,
+        "effect_ci95": [
+          0.21929,
+          0.24586
+        ],
+        "confidence": 0.9176,
+        "posterior_mean": 0.875
+      },
+      "status": "insufficient_evidence",
+      "reasons": [
+        "pair_support 6 < 20"
+      ]
+    }
+  ]
+}

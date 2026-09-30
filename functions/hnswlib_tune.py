@@ -49,7 +49,14 @@ from utils.posterior_proposal_checker import (
     format_check_result_for_llm,
     hard_reject,
 )
-from utils.static_knowledge import StaticKnowledgeBase, StaticKnowledgeSelector
+from conditional_policy.runtime import (
+    RuntimeConfig as ConditionalPolicyRuntimeConfig,
+    build_history_arrays as build_conditional_policy_history,
+    build_runtime_symptom as build_conditional_policy_symptom,
+    format_policy_context as format_conditional_policy_context,
+    load_policy_book as load_conditional_policy_book,
+    match_policies as match_conditional_policies,
+)
 from utils.subgroup_insights import (
     build_insight_cards,
     build_parameter_discretization,
@@ -1621,10 +1628,12 @@ def _count_stage_b_runs(trials: Sequence[Dict[str, Any]]) -> int:
     )
 
 
-# Initialization seeds (subgroup mining / transfer / external seeds / LSH)
-# execute before LLM tuning rounds; the search budget does NOT include them.
+# Initialization seeds (subgroup mining / transfer / external seeds / LSH /
+# regression-tree regions) execute before LLM tuning rounds; the search
+# budget does NOT include them.
 _SEED_PROPOSAL_SOURCES = frozenset(
-    {"subgroup_init", "transfer_seed", "external_seed_file", "lsh_space_fill"}
+    {"subgroup_init", "transfer_seed", "external_seed_file", "lsh_space_fill",
+     "regression_tree_region"}
 )
 
 
@@ -3334,14 +3343,8 @@ def _stage_a_plan_hnsw(
     refinement_cfg: Dict[str, Any],
     refinement_bootstrap_cfg: Dict[str, Any],
     refinement_seed_cfg: Dict[str, Any],
-    subgroup_init: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     base_search_space = agent.space.export_parameter_space()
-    if subgroup_init is not None:
-        # Whole-task execution range = the mined range narrowed into the yaml
-        # base space. yaml params are NOT mutated; the narrowing happens via
-        # frozen_search_space → per-round allowed_values_override.
-        base_search_space = agent.space.normalize_constraints(subgroup_init["mined_specs"])
     knowledge_mode = str(knowledge_cfg.get("mode", "knowledge_base_driven")).strip().lower()
     bootstrap_enabled = bool(refinement_bootstrap_cfg.get("enabled", True))
     similar_task_top_k = _resolve_similar_task_top_k(
@@ -3409,7 +3412,7 @@ def _stage_a_plan_hnsw(
                     "best_qps": float(perf.get("best_qps", 0) or 0),
                 })
     transfer_context = {"tasks": []}
-    if subgroup_init is None and transfer_enabled and bootstrap_enabled:
+    if transfer_enabled and bootstrap_enabled:
         transfer_context = _build_bootstrap_transfer_context(
             models_dir=transfer_models_dir,
             recall_threshold=float(stage_policy["recall_threshold"]),
@@ -3437,19 +3440,14 @@ def _stage_a_plan_hnsw(
         knowledge_context=knowledge_context,
         recall_threshold=float(stage_policy["recall_threshold"]),
     )
-    if subgroup_init is not None:
-        # JSON-only initialization: seeds come exclusively from the mined card.
-        initial_design_seed_candidates = list(subgroup_init.get("seeds") or [])
-        cold_start_cards = _subgroup_init_cold_start_cards(subgroup_init["card"])
-    else:
-        initial_design_seed_candidates = _history_only_seed_candidates(
-            agent,
-            transfer_context=transfer_context,
-            allowed_values_override=base_search_space,
-            insight_candidates=insight_candidates,
-            refinement_seed_cfg=refinement_seed_cfg,
-            recall_threshold=float(stage_policy["recall_threshold"]),
-        )
+    initial_design_seed_candidates = _history_only_seed_candidates(
+        agent,
+        transfer_context=transfer_context,
+        allowed_values_override=base_search_space,
+        insight_candidates=insight_candidates,
+        refinement_seed_cfg=refinement_seed_cfg,
+        recall_threshold=float(stage_policy["recall_threshold"]),
+    )
     # ── external seed file ──────────────────────────────────────────────
     external_seed_file = refinement_seed_cfg.get("external_seed_file", "").strip()
     if external_seed_file:
@@ -3507,16 +3505,6 @@ def _stage_a_plan_hnsw(
             "seed_candidate_count": len(initial_design_seed_candidates),
         },
         "execution_per_round": 1,
-        "subgroup_init": (
-            {
-                "json_path": subgroup_init.get("json_path", ""),
-                "card_id": subgroup_init.get("card_id", ""),
-                "mined_specs": copy.deepcopy(subgroup_init.get("mined_specs") or {}),
-                "seed_candidate_count": len(initial_design_seed_candidates),
-            }
-            if subgroup_init is not None
-            else None
-        ),
     }
     return {
         "generated_at": utc_now_iso(),
@@ -3564,6 +3552,74 @@ def _build_best_so_far_curve(
             }
         )
     return curve
+
+
+def _build_conditional_policy_text(
+    *,
+    all_trials: Sequence[Dict[str, Any]],
+    last_metrics: Optional[Dict[str, Any]],
+    recall_threshold: float,
+    book: Dict[str, Any],
+    cfg: "ConditionalPolicyRuntimeConfig",
+    logger: logging.Logger,
+) -> Tuple[str, Dict[str, Any]]:
+    """Deterministic conditional-policy prompt block for one round (fail-open).
+
+    Symptom <- last executed trial + this run's own successful trials.
+    hnswlib has no expansion / traversal-effectiveness counters, so those
+    symptom dimensions are wildcards; with no (or too little) history the
+    full accepted set is injected instead.
+    """
+    log: Dict[str, Any] = {
+        "enabled": True,
+        "n_accepted_policies": len(book.get("policies") or []),
+        "n_history_trials": 0,
+        "matched_policy_ids": [],
+        "fallback": False,
+        "fallback_reason": "",
+        "symptom": None,
+        "symptom_detail": {},
+        "chars": 0,
+        "skipped_reason": "",
+        "elapsed_s": 0.0,
+    }
+    t0 = time.perf_counter()
+    try:
+        if not book.get("policies"):
+            log["skipped_reason"] = book.get("reason") or "no_accepted_policies"
+            return "", log
+        history_by_metric, recalls, n_history = build_conditional_policy_history(all_trials)
+        log["n_history_trials"] = n_history
+        symptom, detail = build_conditional_policy_symptom(
+            last_metrics, history_by_metric, recalls, recall_threshold, cfg
+        )
+        log["symptom"] = symptom.to_dict() if symptom is not None else None
+        log["symptom_detail"] = detail
+        matches = (
+            match_conditional_policies(symptom, book["policies"], cfg)
+            if symptom is not None else []
+        )
+        log["matched_policy_ids"] = [m["policy"]["policy_id"] for m in matches]
+        log["fallback"] = not matches
+        log["fallback_reason"] = "" if matches else (
+            "no_matching_policy" if detail.get("reason") == "ok"
+            else (detail.get("reason") or "no_matching_policy")
+        )
+        text = format_conditional_policy_context(
+            matches,
+            policies=book["policies"],
+            config=cfg,
+            detail=detail,
+            source=str((book.get("meta") or {}).get("source") or ""),
+        )
+        log["chars"] = len(text)
+        return text, log
+    except Exception as exc:  # fail-open: never break the tuning loop
+        logger.warning("Conditional policy matching failed (ignored): %s", exc)
+        log["skipped_reason"] = f"error: {exc}"
+        return "", log
+    finally:
+        log["elapsed_s"] = round(time.perf_counter() - t0, 4)
 
 
 def _configure_agent_logging(agentic_cfg: Dict[str, Any]) -> None:
@@ -3671,33 +3727,11 @@ def run_pipeline(config_path: str, resume: bool = True, dry_run: bool = False) -
         refinement_cfg.get("seed_initial_design") if isinstance(refinement_cfg.get("seed_initial_design"), dict) else {}
     )
 
-    # ── Subgroup-mining initialization (optional: JSON-only init source) ──
-    subgroup_init_cfg = (
-        agentic_cfg.get("subgroup_init") if isinstance(agentic_cfg.get("subgroup_init"), dict) else {}
-    )
-    subgroup_init: Dict[str, Any] | None = None
-    if subgroup_init_cfg:
-        json_path_raw = subgroup_init_cfg.get("json_path")
-        if not isinstance(json_path_raw, str) or not json_path_raw.strip():
-            raise ValueError("agentic.subgroup_init.json_path must be a string path to an insight JSON.")
-        if refinement_seed_cfg.get("external_seed_file", "").strip():
-            raise ValueError(
-                "agentic.subgroup_init and search_space_refinement.seed_initial_design."
-                "external_seed_file are mutually exclusive."
-            )
-        payload = _load_subgroup_init_payload(json_path_raw.strip())
-        # Card selection + range/seeds extraction operate on the RAW payload:
-        # _normalize_insight_card trims region to {description, dimensions},
-        # dropping region.elite/coarse which encode the mined ranges.
-        raw_path = Path(json_path_raw.strip()).expanduser().resolve()
-        raw_payload = _load_json_object(raw_path)
-        card = _select_subgroup_init_card(raw_payload if raw_payload.get("insight_cards") else payload)
-        subgroup_init = {
-            "json_path": str(raw_path),
-            "payload": payload,
-            "card_id": str(card.get("card_id", "")),
-            "card": card,
-        }
+    # ── Initialization mode (history | regression_tree | regtree) ──
+    # NOTE: agentic.subgroup_init is no longer honoured by this pipeline; the
+    # nhq / unify / filter_diskann pipelines keep their own subgroup wiring.
+    initial_design_cfg = agentic_cfg.get("initial_design") or {}
+    init_mode = str(initial_design_cfg.get("mode", "history")).strip().lower()
 
     knowledge_mode = str(knowledge_cfg.get("mode", "knowledge_base_driven")).strip().lower()
     if knowledge_mode not in {"full_context_no_rag", "knowledge_base_driven"}:
@@ -3708,16 +3742,31 @@ def run_pipeline(config_path: str, resume: bool = True, dry_run: bool = False) -
     if overflow_policy not in {"truncate"}:
         raise ValueError("agentic.knowledge.overflow_policy must be 'truncate'.")
 
-    # ── Static Knowledge: recall-constraint-aware card selection ──
-    static_kb = StaticKnowledgeBase()
     # Build a simple (prompt) -> str wrapper around the agent's LLM caller
+    # (used by CurrentTaskMemory.update_memory below).
     _llm_caller = lambda prompt: agent._invoke_llm("knowledge_match", prompt)
-    static_selector = StaticKnowledgeSelector(static_kb, llm_caller=_llm_caller)
+
+    # ── Conditional policy book (offline-validated symptom -> intervention) ──
+    # Replaces the per-round static-knowledge card selection, which cost one
+    # LLM call per round; matching is deterministic and LLM-free.
+    conditional_policy_cfg = (
+        agentic_cfg.get("conditional_policy")
+        if isinstance(agentic_cfg.get("conditional_policy"), dict) else {}
+    )
+    conditional_policy_enabled = bool(conditional_policy_cfg.get("enabled", True))
+    conditional_policy_runtime_cfg = ConditionalPolicyRuntimeConfig.from_mapping(conditional_policy_cfg)
+    conditional_policy_book = (
+        load_conditional_policy_book(conditional_policy_runtime_cfg.policy_file)
+        if conditional_policy_enabled
+        else {"policies": [], "meta": {}, "loaded": False, "reason": "disabled"}
+    )
     _plog.info(
-        "Static knowledge loaded: %d cards (%d infeasible, %d feasible)",
-        len(static_kb.get_all_cards("HNSW")),
-        len(static_kb.get_cards_by_branch("HNSW", "recall-infeasible")),
-        len(static_kb.get_cards_by_branch("HNSW", "recall-feasible")),
+        "Conditional policy book: %d accepted policies (source=%s) from %s%s",
+        len(conditional_policy_book["policies"]),
+        (conditional_policy_book.get("meta") or {}).get("source"),
+        (conditional_policy_book.get("meta") or {}).get("path"),
+        "" if conditional_policy_book["policies"] else
+        f" — DISABLED ({conditional_policy_book.get('reason', 'no_accepted_policies')})",
     )
 
     if knowledge_mode == "knowledge_base_driven":
@@ -3742,22 +3791,6 @@ def run_pipeline(config_path: str, resume: bool = True, dry_run: bool = False) -
         model_cfg=model_cfg,
         llm_caller=None,
     )
-
-    # ── Subgroup-mining initialization: derive range + seeds from the card ──
-    if subgroup_init is not None:
-        base_specs = agent.space.export_parameter_space()
-        subgroup_init["mined_specs"] = _subgroup_init_range(subgroup_init["card"], base_specs)
-        subgroup_init["seeds"] = _subgroup_init_seeds(
-            agent,
-            subgroup_init["card"],
-            agent.space.normalize_constraints(subgroup_init["mined_specs"]),
-        )
-        _plog.info(
-            "Subgroup-mining init: card=%s mined=%s seeds=%d (transfer bootstrap skipped)",
-            subgroup_init["card_id"],
-            json.dumps(subgroup_init["mined_specs"], ensure_ascii=False),
-            len(subgroup_init["seeds"]),
-        )
 
     # ── Current Task Memory (the sole structured memory for this task) ─────
     current_task_cfg = agentic_cfg.get("current_task_memory") or {}
@@ -3866,7 +3899,6 @@ def run_pipeline(config_path: str, resume: bool = True, dry_run: bool = False) -
             refinement_cfg=refinement_cfg,
             refinement_bootstrap_cfg=refinement_bootstrap_cfg,
             refinement_seed_cfg=refinement_seed_cfg,
-            subgroup_init=subgroup_init,
         )
 
     base_search_space = copy.deepcopy(stage_a_plan.get("base_search_space") or agent.space.export_parameter_space())
@@ -3876,6 +3908,108 @@ def run_pipeline(config_path: str, resume: bool = True, dry_run: bool = False) -
     stage_a_report = copy.deepcopy(stage_a_plan.get("stage_a_report") or {})
     initial_design_seed_candidates_fixed = copy.deepcopy(stage_a_plan.get("initial_design_seed_candidates") or [])
     cold_start_cards = copy.deepcopy(stage_a_plan.get("cold_start_cards") or [])
+    # Regression-tree initialization context: rendered into every round's
+    # proposal prompt (empty unless init_mode == "regression_tree").
+    regression_tree_context = ""
+    regression_tree_report: Dict[str, Any] = {}
+
+    # ── Regression-tree initialization ───────────────────────────────────────
+    # Prunes the full build space from historical trials (regression-tree
+    # splits on qualifying-QPS SSE + two CI pruning rounds) and injects the
+    # surviving regions as prompt context, seed anchors, and the frozen space.
+    rt_cfg = initial_design_cfg.get("regression_tree")
+    rt_cfg = rt_cfg if isinstance(rt_cfg, dict) else {}
+    rt_trials = str(rt_cfg.get("trials_path", "")).strip()
+    if init_mode in ("regression_tree", "regtree"):
+        if not rt_trials:
+            _plog.warning(
+                "initial_design.mode=regression_tree requires "
+                "initial_design.regression_tree.trials_path; keeping base space"
+            )
+        else:
+            rt_path = Path(rt_trials)
+            if not rt_path.is_absolute():
+                rt_path = Path.cwd() / rt_path
+            try:
+                from utils.regression_tree_init import run_regression_tree_init
+
+                regression_tree_report = run_regression_tree_init(
+                    cfg.get("params") or {},
+                    rt_path,
+                    recall_threshold=recall_threshold,
+                    min_leaf_samples=int(rt_cfg.get("min_leaf_samples", 5)),
+                    recall_ci_confidence=float(rt_cfg.get("recall_ci_confidence", 0.95)),
+                    qps_ci_confidence=float(rt_cfg.get("qps_ci_confidence", 0.95)),
+                    max_depth=rt_cfg.get("max_depth"),
+                    n1_ci_policy=str(rt_cfg.get("n1_ci_policy", "value")),
+                    qps_ci_statistic=str(rt_cfg.get("qps_ci_statistic", "mean")),
+                    bootstrap_resamples=int(rt_cfg.get("bootstrap_resamples", 2000)),
+                    dedupe_by_param_key=str(rt_cfg.get("dedupe_by_param_key", "keep_all")),
+                    seed_count=int(rt_cfg.get("seed_count", 8)),
+                    seeds_per_region=int(rt_cfg.get("seeds_per_region", 1)),
+                    seed=int(cfg["search"]["seed"]),
+                    freeze_mode=str(rt_cfg.get("freeze_mode", "bbox")),
+                    prompt_max_regions=int(rt_cfg.get("prompt_max_regions", 12)),
+                    global_median_scope=str(rt_cfg.get("global_median_scope", "all")),
+                    allow_empty=True,
+                )
+            except Exception as exc:  # noqa: BLE001 — init must never kill the run
+                _plog.warning("Regression-tree init failed (%s); keeping base space", exc)
+
+        if regression_tree_report.get("ok"):
+            regression_tree_context = str(regression_tree_report.get("prompt_text") or "")
+            rt_seeds = [
+                s
+                for s in (
+                    _canonical_seed_candidate(
+                        agent,
+                        params=seed_candidate["params"],
+                        allowed_values_override=base_search_space,
+                        source="regression_tree_region",
+                        note=str(seed_candidate.get("note", "")),
+                    )
+                    for seed_candidate in (regression_tree_report.get("seed_candidates") or [])
+                )
+                if s is not None
+            ]
+            if rt_seeds:
+                initial_design_seed_candidates_fixed = rt_seeds
+                cold_start_cards = []  # the pruned regions replace the cards
+            if str(rt_cfg.get("freeze_mode", "bbox")) != "off" and regression_tree_report.get("bounding_box"):
+                frozen_search_space = copy.deepcopy(regression_tree_report["bounding_box"])
+            if bool(rt_cfg.get("write_artifact", True)):
+                try:
+                    rt_artifact_dir = Path(str(rt_cfg.get("artifact_dir", "results/hnswlib/regression_tree_init")))
+                    if not rt_artifact_dir.is_absolute():
+                        rt_artifact_dir = Path.cwd() / rt_artifact_dir
+                    write_json(rt_artifact_dir / f"{trials_name}.json", regression_tree_report)
+                    (rt_artifact_dir / f"{trials_name}.prompt.txt").write_text(
+                        str(regression_tree_report.get("prompt_text") or ""), encoding="utf-8"
+                    )
+                except Exception as exc:  # noqa: BLE001 — artifacts are diagnostics only
+                    _plog.warning("Regression-tree artifact write failed (%s)", exc)
+            _plog.info(
+                "Regression-tree init: %d/%d leaves survived (r1=%d, r2=%d), %d seeds, "
+                "context %d chars | trials=%s",
+                len(regression_tree_report.get("surviving_regions") or []),
+                (regression_tree_report.get("tree") or {}).get("n_leaves", 0),
+                len(regression_tree_report.get("pruned_round1") or []),
+                len(regression_tree_report.get("pruned_round2") or []),
+                len(initial_design_seed_candidates_fixed),
+                len(regression_tree_context),
+                rt_trials,
+            )
+        stage_a_report["regression_tree_init"] = {
+            "enabled": bool(regression_tree_report.get("ok")),
+            "trials_path": rt_trials,
+            "reason": regression_tree_report.get("reason", "disabled"),
+            "n_surviving_regions": len(regression_tree_report.get("surviving_regions") or []),
+            "n_pruned_round1": len(regression_tree_report.get("pruned_round1") or []),
+            "n_pruned_round2": len(regression_tree_report.get("pruned_round2") or []),
+            "seed_candidate_count": len(initial_design_seed_candidates_fixed),
+            "prompt_context_chars": len(regression_tree_context),
+        }
+    # ── End regression-tree initialization ───────────────────────────────────
 
     frozen_search_space_report = {
         "enabled": True,
@@ -3888,6 +4022,15 @@ def run_pipeline(config_path: str, resume: bool = True, dry_run: bool = False) -
         "used_similar_tasks": list(stage_a_report.get("used_similar_tasks") or []),
         "used_insight_cards": copy.deepcopy(stage_a_report.get("used_insight_cards") or []),
         "execution_per_round": stage_b_execution_per_round,
+        "regression_tree_freeze": {
+            "active": init_mode in ("regression_tree", "regtree")
+            and bool(regression_tree_report.get("ok")),
+            "freeze_mode": str(rt_cfg.get("freeze_mode", "bbox"))
+            if init_mode in ("regression_tree", "regtree")
+            else "off",
+            "bounding_box": copy.deepcopy(regression_tree_report.get("bounding_box")),
+            "n_surviving_regions": len(regression_tree_report.get("surviving_regions") or []),
+        },
     }
 
     dry_plan: Dict[str, Any] = {
@@ -3899,6 +4042,10 @@ def run_pipeline(config_path: str, resume: bool = True, dry_run: bool = False) -
             "knowledge_context": copy.deepcopy(knowledge_context_fixed),
             "stage_a_report": copy.deepcopy(stage_a_report),
             "initial_design_seed_candidates": copy.deepcopy(initial_design_seed_candidates_fixed),
+            "regression_tree_init": copy.deepcopy(stage_a_report.get("regression_tree_init") or {}),
+            "regression_tree_regions": copy.deepcopy(
+                regression_tree_report.get("surviving_regions") or []
+            ),
         },
         "stage_b_budget_total": budget,
         "stage_b_execution_per_round": stage_b_execution_per_round,
@@ -3930,6 +4077,9 @@ def run_pipeline(config_path: str, resume: bool = True, dry_run: bool = False) -
     # Per-(M, efC) visit counts.  A pair is BANNED once it has been explored
     # 3 times — the model can no longer propose it (any round).
     construction_visit_counts: dict = {}
+    # Per-round conditional-policy matching logs (persisted to dry_run_plan /
+    # stage_report since proposal_log itself is never serialized).
+    conditional_policy_round_logs: List[Dict[str, Any]] = []
 
     # Initialization-seed configs: used to exclude seed executions from the
     # tuning budget even when trials are reloaded in minimal format (which
@@ -3943,7 +4093,8 @@ def run_pipeline(config_path: str, resume: bool = True, dry_run: bool = False) -
     while True:
         stage_b_budget_used = _count_stage_b_runs(all_trials)
         # The search budget covers LLM tuning rounds only; initialization
-        # seeds (subgroup mining / transfer / external / LSH) do not consume it.
+        # seeds (subgroup mining / transfer / external / LSH /
+        # regression-tree regions) do not consume it.
         tuning_budget_used = stage_b_budget_used - _count_seed_runs(all_trials, seed_param_keys)
         if tuning_budget_used >= budget or stage_b_budget_used >= max_rounds:
             break
@@ -3986,7 +4137,7 @@ def run_pipeline(config_path: str, resume: bool = True, dry_run: bool = False) -
 
         # ── Diagnostic LLM call: diagnose last execution → propose next ──
         # ── Per-round timing (initialised for all code paths) ──
-        knowledge_selection_time_s = 0.0
+        policy_match_time_s = 0.0
         memory_retrieval_time_s = 0.0
         llm_call_time_s = 0.0
 
@@ -4061,42 +4212,38 @@ def run_pipeline(config_path: str, resume: bool = True, dry_run: bool = False) -
                         interval_table_context = build_current_task_memory_prompt(interval_table)
             memory_retrieval_time_s = round(time.perf_counter() - t_mem_start, 4)
 
-            # ── Select static knowledge cards for current state ──
-            knowledge_selection_time_s = 0.0
-            static_knowledge_text = ""
-            t_know_start = time.perf_counter()
-            if static_selector is not None:
-                try:
-                    if mem_obs is not None:
-                        # Normal case: use last trial's observed metrics
-                        obs_for_knowledge = mem_obs
-                    else:
-                        # Cold start: construct a default observation
-                        obs_for_knowledge = {
-                            "config": {},
-                            "qps": 0,
-                            "recall": 0,
-                            "recall_threshold": recall_threshold,
-                            "diagnostic_metrics": {},
-                        }
-                    selected = static_selector.select_best_match(
-                        task_descriptor={
-                            "algorithm": "HNSW",
-                            "dataset": str(cfg.get("dataset", "")),
-                            "recall_threshold": recall_threshold,
-                        },
-                        observation=obs_for_knowledge,
-                        full_state=mem_full_state,
-                        interval_table=(memory_ctx or {}).get(
-                            "runtime_structural_interval_table"
-                        ),
-                    )
-                    static_knowledge_text = (
-                        StaticKnowledgeSelector.format_knowledge_context_for_llm(selected)
-                    )
-                except Exception:
-                    static_knowledge_text = ""
-            knowledge_selection_time_s = round(time.perf_counter() - t_know_start, 4)
+            # ── Conditional policy matching (deterministic, no LLM) ──
+            # Symptom <- last executed trial + this run's own successful
+            # trials.  hnswlib has no expansion / traversal-effectiveness
+            # counters, so those dimensions are wildcards; with no (or too
+            # little) history the full accepted set is injected.  Fail-open.
+            conditional_policy_text = ""
+            conditional_policy_log: Dict[str, Any] = {"enabled": False, "skipped_reason": "startup_failed"}
+            policy_match_time_s = 0.0
+            if conditional_policy_enabled:
+                conditional_policy_text, conditional_policy_log = _build_conditional_policy_text(
+                    all_trials=all_trials,
+                    last_metrics=last_metrics if isinstance(last_metrics, dict) else None,
+                    recall_threshold=recall_threshold,
+                    book=conditional_policy_book,
+                    cfg=conditional_policy_runtime_cfg,
+                    logger=_plog,
+                )
+                policy_match_time_s = conditional_policy_log.get("elapsed_s", 0.0)
+                conditional_policy_round_logs.append(
+                    {**conditional_policy_log, "round_idx": stage_b_round_idx}
+                )
+                _plog.info(
+                    "Round %d conditional policy: matched=%s fallback=%s history=%d chars=%d (%.4fs)%s",
+                    stage_b_round_idx,
+                    conditional_policy_log.get("matched_policy_ids") or "-",
+                    conditional_policy_log.get("fallback"),
+                    conditional_policy_log.get("n_history_trials", 0),
+                    conditional_policy_log.get("chars", 0),
+                    policy_match_time_s,
+                    f" skipped={conditional_policy_log.get('skipped_reason')}"
+                    if conditional_policy_log.get("skipped_reason") else "",
+                )
 
             # ── LLM call (timed) ──
             t_llm_start = time.perf_counter()
@@ -4131,9 +4278,10 @@ def run_pipeline(config_path: str, resume: bool = True, dry_run: bool = False) -
                 allowed_values_override=allowed_values_override,
                 cold_start_cards=cold_start_cards,
                 memory_context=memory_ctx,
-                static_knowledge_context=static_knowledge_text,
+                conditional_policy_context=conditional_policy_text,
                 proposal_check_feedback=last_check_feedback,
                 interval_table_context=interval_table_context,
+                regression_tree_context=regression_tree_context,
                 force_construction=force_construction,
                 excluded_construction_pairs=excluded_construction_pairs,
             )
@@ -4339,9 +4487,10 @@ def run_pipeline(config_path: str, resume: bool = True, dry_run: bool = False) -
                 allowed_values_override=allowed_values_override,
                 cold_start_cards=cold_start_cards,
                 memory_context=memory_ctx,
-                static_knowledge_context=static_knowledge_text,
+                conditional_policy_context=conditional_policy_text,
                 proposal_check_feedback=rejection_feedback,
                 interval_table_context=interval_table_context,
+                regression_tree_context=regression_tree_context,
                 force_construction=force_construction,
                 excluded_construction_pairs=excluded_construction_pairs,
             )
@@ -4439,9 +4588,10 @@ def run_pipeline(config_path: str, resume: bool = True, dry_run: bool = False) -
                     allowed_values_override=allowed_values_override,
                     cold_start_cards=cold_start_cards,
                     memory_context=memory_ctx,
-                    static_knowledge_context=static_knowledge_text,
+                    conditional_policy_context=conditional_policy_text,
                     proposal_check_feedback=reject_feedback,
                     interval_table_context=interval_table_context,
+                    regression_tree_context=regression_tree_context,
                     force_construction=force_construction,
                     excluded_construction_pairs=excluded_construction_pairs,
                 )
@@ -4696,7 +4846,9 @@ def run_pipeline(config_path: str, resume: bool = True, dry_run: bool = False) -
         proposal_log["round_prompt_tokens"] = round_prompt
         proposal_log["round_completion_tokens"] = round_completion
         # Per-round timing
-        proposal_log["knowledge_selection_time_s"] = knowledge_selection_time_s
+        proposal_log["knowledge_selection_time_s"] = policy_match_time_s  # legacy key kept for consumers
+        proposal_log["policy_match_time_s"] = policy_match_time_s
+        proposal_log["conditional_policy"] = conditional_policy_log
         proposal_log["memory_retrieval_time_s"] = memory_retrieval_time_s
         proposal_log["llm_call_time_s"] = llm_call_time_s
         proposal_log["workload_time_s"] = round(
@@ -4722,16 +4874,17 @@ def run_pipeline(config_path: str, resume: bool = True, dry_run: bool = False) -
             )
         _plog.info(
             "Round %d LLM tokens: +%d prompt, +%d completion (cumulative %d/%d) | "
-            "timing: knowledge=%.3fs memory=%.3fs llm=%.3fs workload=%.3fs",
+            "timing: policy=%.3fs memory=%.3fs llm=%.3fs workload=%.3fs",
             stage_b_round_idx, round_prompt, round_completion,
             agent.total_prompt_tokens, agent.total_completion_tokens,
-            knowledge_selection_time_s, memory_retrieval_time_s,
+            policy_match_time_s, memory_retrieval_time_s,
             llm_call_time_s,
             sum(t.get("elapsed_s", 0) for t in round_trials),
         )
         round_token_snapshot = agent.token_snapshot()
 
     if dry_run:
+        dry_plan["conditional_policy_rounds"] = conditional_policy_round_logs
         write_json(output_dir / "dry_run_plan.json", dry_plan)
         return 0
 
@@ -4770,12 +4923,30 @@ def run_pipeline(config_path: str, resume: bool = True, dry_run: bool = False) -
             "knowledge_context": copy.deepcopy(knowledge_context_fixed),
             "stage_a_report": copy.deepcopy(stage_a_report),
             "initial_design_seed_candidates": copy.deepcopy(initial_design_seed_candidates_fixed),
+            "regression_tree_init": copy.deepcopy(stage_a_report.get("regression_tree_init") or {}),
+            "regression_tree_regions": copy.deepcopy(
+                regression_tree_report.get("surviving_regions") or []
+            ),
         },
         "stage_b": {
             "execution_per_round": stage_b_execution_per_round,
             "max_rounds": max_rounds,
             "used_rounds": final_stage_b_runs,
             "best_so_far_curve": _build_best_so_far_curve(stage_trials, recall_threshold),
+            "conditional_policy": {
+                "n_rounds": len(conditional_policy_round_logs),
+                "n_matched_rounds": sum(
+                    1 for r in conditional_policy_round_logs if r.get("matched_policy_ids")
+                ),
+                "n_fallback_rounds": sum(
+                    1 for r in conditional_policy_round_logs if r.get("fallback")
+                ),
+                "matched_policy_ids": sorted({
+                    pid
+                    for r in conditional_policy_round_logs
+                    for pid in (r.get("matched_policy_ids") or [])
+                }),
+            },
         },
         "llm_tokens": {
             "init_prompt_tokens": agent.init_prompt_tokens,

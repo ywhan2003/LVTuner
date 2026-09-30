@@ -1,7 +1,27 @@
-# SIFT-128 L2, recall threshold 0.95 — subgroup-mining initialization run.
-# Initialization: single best config mined from sift.jsonl (subgroup_init);
-# the mined range becomes the execution-time tuning constraint. The search
-# budget of 20 covers LLM tuning rounds ONLY (the init seed does not count).
+# SIFT-128 L2, recall threshold 0.95 — regression-tree initialization run.
+#
+# Initialization (agentic.initial_design.mode: regression_tree): the full
+# build space is pruned OFFLINE from a historical trials file with a
+# CART-style regression tree (utils/regression_tree_init.py).  The surviving
+# regions are (a) rendered into the diagnose prompt, (b) turned into round-1
+# cold-start seeds, and (c) with freeze_mode: bbox, their bounding box
+# becomes the execution-time tuning constraint (the `params:` block below is
+# NOT mutated; the freeze is applied per round via allowed_values_override).
+#
+# trials_path must point at a PRIOR trials file.  This run writes its own
+# results/hnswlib/trials/<trials_name>.jsonl — do NOT point trials_path at
+# that same file.  If the file is missing, empty, or yields no usable rows,
+# the init fails open and the run continues on the full YAML space with
+# plain history-based seeds.  It is also independent of
+# search_space_refinement.seed_initial_design.external_seed_file (both may
+# be set; the regtree seeds win only when it produces seeds of its own).
+#
+# The search budget of 20 covers LLM tuning rounds ONLY — init seeds are
+# exempt from it (see _SEED_PROPOSAL_SOURCES / seed_param_keys in
+# functions/hnswlib_tune.py).  Note seed_count: 8 is a POOL: exactly one
+# seed is executed as the round-1 cold start, the rest only make the pool
+# (and are budget-exempt if the LLM later proposes them).
+#
 # All LLM calls use the .env configuration (model_config_key: DEEPSEEK_CONFIG).
 
 benchmark:
@@ -44,10 +64,50 @@ search:
 
 agentic:
   enabled: true
-  subgroup_init:
-    json_path: /home/ywhan/coding/RFANNSTuner/data/hnswlib_insights/sift.json
   logging:
     mode: verbose
+  initial_design:
+    mode: regression_tree            # history | regression_tree | regtree
+    regression_tree:
+      trials_path: results/hnswlib/trials/sift_95.jsonl   # PRIOR trials file
+      min_leaf_samples: 5
+      recall_ci_confidence: 0.95
+      qps_ci_confidence: 0.95
+      max_depth: null
+      n1_ci_policy: value            # value | conservative
+      qps_ci_statistic: mean         # mean | bootstrap_median (needs numpy)
+      bootstrap_resamples: 2000
+      dedupe_by_param_key: keep_all  # keep_all | first | mean
+      global_median_scope: all       # all | surviving (round-2 median scope)
+      seed_count: 8
+      seeds_per_region: 1
+      freeze_mode: bbox              # bbox | off
+      prompt_max_regions: 12
+      write_artifact: true
+      artifact_dir: results/hnswlib/regression_tree_init
+  transfer:
+    # RFANNSTuner's regression-tree config disables transfer.  LVTuner used to
+    # suppress the transfer path implicitly whenever subgroup_init was set;
+    # with that wiring gone, disable it explicitly to keep the same behaviour.
+    enabled: false
+  search_space_refinement:
+    enabled: false
+  conditional_policy:
+    # Deterministic, LLM-free replacement for the per-round static-knowledge
+    # card selection (which cost one LLM call per round).  Per round, a
+    # symptom is built from the last executed trial against this run's own
+    # successful trials and matched against the offline-validated policy
+    # book; with no (or too little) history the full accepted set is
+    # injected instead.  hnswlib does not instrument expansion_cnt /
+    # traversal_effectiveness, so those two symptom dimensions are
+    # wildcards.  The match is advisory only: current-task evidence always
+    # wins.  Fail-open — a missing/malformed file simply leaves the prompt
+    # unchanged.
+    enabled: true
+    policy_file: knowledge_base/conditional_policy/policies.json
+    max_policies_per_round: 3
+    max_context_chars: 6000
+    min_history_for_matching: 5   # below this, inject the full accepted set
 
 execution:
   max_workers: 1
@@ -56,7 +116,7 @@ execution:
 
 output:
   dir: results/hnswlib
-  trials_name: sift_95_subgroup_init
+  trials_name: sift_95_regtree_init
 
 params:
   M:

@@ -1,9 +1,9 @@
-# Light
+# LVTuner
 
-A unified tuning framework for four ANN tuning pipelines: **hnswlib**, **UNIFY**, **DiskANN** (diskann-filter / filter-diskann), and **NHQ**. Every pipeline shares the same architecture:
+A unified tuning framework for four ANN tuning pipelines: **hnswlib**, **UNIFY**, **DiskANN** (diskann-filter / filter-diskann), **NHQ**, **ACORN**. Every pipeline shares the same architecture:
 
-- **Knowledge-driven**: static diagnostic knowledge cards under `knowledge_base/<ALGORITHM>/` (Signals / Interpretation / margin-tiered Intervention). Each round, the closest single card is retrieved by an LLM from the last round's full metrics (`select_best_match`) and injected into the diagnosis prompt.
-- **Subgroup-mining initialization**: `agentic.subgroup_init.json_path` points to a historical-task subgroup-mining JSON — its mined range becomes the execution-time tuning constraint and its mined best point becomes the initial seed (seed rounds do not consume the budget).
+- **Knowledge-driven**: the **hnswlib** pipeline injects **conditional policies** each round — deterministic symptom→intervention rules from an offline-validated policy book (`knowledge_base/conditional_policy/policies.json`, matched by `conditional_policy/runtime.py`, no LLM cost; the full accepted set is injected when no history exists). The other pipelines retrieve the closest static diagnostic knowledge card under `knowledge_base/<ALGORITHM>/` via an LLM (`select_best_match`).
+- **Regression-tree initialization** (hnswlib): `agentic.initial_design.mode: regression_tree` prunes the full build space from a historical trials file (`utils/regression_tree_init.py`) — surviving regions become prompt context, cold-start seeds (`source="regression_tree_region"`, budget-exempt), and, with `freeze_mode: bbox`, the frozen search space. The other pipelines keep the subgroup-mining initialization (`agentic.subgroup_init.json_path`): mined range → execution-time constraint, mined best point → initial seed.
 - **Dominance repository**: each construction setting maintains a `(L, U]` evidence interval (L = search param of the highest-recall infeasible point, U = search param of the highest-QPS feasible point; all other parameters are recorded as controlled variables). A hard checker rejects `s <= L` / `s > U` and triggers LLM re-proposal.
 - **Mandatory LLM proposals**: every round's proposal must be LLM-generated — failures raise errors. All model configuration is read from `.env`.
 
@@ -12,13 +12,14 @@ A unified tuning framework for four ANN tuning pipelines: **hnswlib**, **UNIFY**
 ## 1. Repository Structure
 
 ```
-Light/
+LVTuner-VLDB/
 ├── main.py                  # Unified entrypoint: python main.py <pipeline> --config <yaml>
 ├── functions/               # Tuning pipeline implementations (hnswlib/unify/nhq/filter_diskann/diskann_filter + shared driver)
 ├── agents/                  # Per-algorithm LLM tuning agents (diagnose + propose)
-├── utils/                   # Shared utilities: static knowledge cards, current-task memory, interval table / hard checker, benchmark runner, subgroup mining
+├── conditional_policy/      # Offline policy-validation pipeline (python -m conditional_policy.cli) + runtime.py (deterministic per-round matcher used by hnswlib)
+├── utils/                   # Shared utilities: static knowledge cards, regression-tree init, current-task memory, interval table / hard checker, benchmark runner, subgroup mining
 ├── configs/                 # Default tuning configs (one per pipeline) + prompts/templates
-├── knowledge_base/          # Diagnostic knowledge cards (HNSW/UNIFY/NHQ/FilterDiskANN/) + parameter-semantics docs + diagnostic trees
+├── knowledge_base/          # Diagnostic knowledge cards (HNSW/UNIFY/NHQ/FilterDiskANN/) + conditional_policy/policies.json + diagnostic_tree.json
 ├── llm_agent/               # LLM call infrastructure
 ├── benchmarks/              # Benchmark scripts per algorithm (hnswlib/nhq/diskann)
 ├── data_generation/         # Data generation tools (HDF5 conversion, fraction/filter-label generation)
@@ -79,17 +80,21 @@ uv run python main.py <pipeline> [--config configs/<x>.yaml] [--no-resume] [--dr
 | `filter-diskann` | `configs/filter_diskann_tune.yaml` | Filter-DiskANN Vamana (R / FilterLBuild / alpha / L, independent unify architecture) |
 | `nhq` | `configs/nhq_tune.yaml` | NHQ hybrid query (M / efConstruction / ef / weight) |
 
-Example (SIFT at τ=0.95 with subgroup-mining initialization — `configs/hnswlib_tune.yaml` is this run; its data paths are machine-specific absolute paths, adjust them to your own):
+Example (SIFT at τ=0.95 with regression-tree initialization + conditional policies — `configs/hnswlib_tune.yaml` is this run; its data paths are machine-specific absolute paths, adjust them to your own):
 
 ```bash
 uv run python main.py hnswlib --config configs/hnswlib_tune.yaml --no-resume
 ```
 
-Key configuration options (the `agentic` block of each yaml is minimal: `enabled` + optional `subgroup_init` + `logging`):
+Key configuration options (the `agentic` block of each yaml):
 
-- `agentic.subgroup_init.json_path`: historical-task subgroup-mining JSON — its mined range becomes the execution-time constraint and its best point the initial seed; changing the path requires `--no-resume`
+- `agentic.initial_design.mode: regression_tree` + `agentic.initial_design.regression_tree.*` (hnswlib): `trials_path` must point at a **prior** trials file (this run writes its own — do not self-reference); missing/empty input fails open and the run continues on the full YAML space. `seed_count` is a pool — exactly one seed executes as the round-1 cold start; all seeds are budget-exempt.
+- `agentic.conditional_policy.*` (hnswlib): deterministic per-round policy matching (`enabled`, `policy_file`, `max_policies_per_round`, `max_context_chars`, `min_history_for_matching`). Below `min_history_for_matching` trials (cold start / resume with minimal rows) the full accepted set is injected instead; hnswlib does not instrument `expansion_cnt`/`traversal_effectiveness`, so those symptom dimensions are wildcards. Fail-open: a missing policy file leaves the prompt unchanged.
+- `agentic.subgroup_init.json_path` (unify / nhq / filter-diskann / diskann-filter): historical-task subgroup-mining JSON — its mined range becomes the execution-time constraint and its best point the initial seed; changing the path requires `--no-resume`
 - `search.recall_threshold` / `search.budget`: target recall / tuning budget (**initialization seed rounds are excluded**)
 - LLM configuration: always read from `.env` (`LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL_NAME`) — no yaml key needed
-- Static knowledge cards: loaded automatically from `knowledge_base/<ALGORITHM>/` — no yaml key needed
+- Static knowledge cards (unify / nhq / filter-diskann / diskann-filter): loaded automatically from `knowledge_base/<ALGORITHM>/` — no yaml key needed
 
-Run artifacts (under `output.dir`): `trials/<name>.jsonl` (compact format: params + metrics{recall,qps} only), `stage_a_plan.json`, `current_task_memory/` (point memory, transitions, interval tables). Runs resume by default; `--dry-run` only generates candidates and commands without executing benchmarks.
+Rebuilding the conditional-policy book (offline, `python -m conditional_policy.cli`): the default synthetic validation run writes `results/conditional_policy/` (`policies.json` etc.); real-data runs use `--real-points results/hnswlib/current_task_memory/<name>.points.jsonl:<task>:<tau> --real-transitions ...transitions.jsonl:<task>:<tau>`. Point the runtime at the resulting file via `agentic.conditional_policy.policy_file`.
+
+Run artifacts (under `output.dir`): `trials/<name>.jsonl` (compact format: params + metrics{recall,qps} only), `stage_a_plan.json` / `stage_report.json` (incl. `regression_tree_init`, `regression_tree_freeze`, and the per-run `conditional_policy` match summary), `current_task_memory/` (point memory, transitions, interval tables), `regression_tree_init/` (regtree report + prompt). Dry runs additionally write `dry_run_plan.json` with `conditional_policy_rounds`. Runs resume by default; `--dry-run` only generates candidates and commands without executing benchmarks.

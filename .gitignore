@@ -7,3 +7,5 @@ models/
 RFANNSTuner/
 indexes/
 build/
+ACORN/tmp/
+ACORN/build-asan/
