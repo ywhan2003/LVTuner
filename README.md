@@ -1,14 +1,5 @@
 # LVTuner
 
-A unified tuning framework for four ANN tuning pipelines: **hnswlib**, **UNIFY**, **DiskANN** (diskann-filter / filter-diskann), **NHQ**, **ACORN**. Every pipeline shares the same architecture:
-
-- **Knowledge-driven**: the **hnswlib** pipeline injects **conditional policies** each round — deterministic symptom→intervention rules from an offline-validated policy book (`knowledge_base/conditional_policy/policies.json`, matched by `conditional_policy/runtime.py`, no LLM cost; the full accepted set is injected when no history exists). The other pipelines retrieve the closest static diagnostic knowledge card under `knowledge_base/<ALGORITHM>/` via an LLM (`select_best_match`).
-- **Regression-tree initialization** (hnswlib): `agentic.initial_design.mode: regression_tree` prunes the full build space from a historical trials file (`utils/regression_tree_init.py`) — surviving regions become prompt context, cold-start seeds (`source="regression_tree_region"`, budget-exempt), and, with `freeze_mode: bbox`, the frozen search space. The other pipelines keep the subgroup-mining initialization (`agentic.subgroup_init.json_path`): mined range → execution-time constraint, mined best point → initial seed.
-- **Dominance repository**: each construction setting maintains a `(L, U]` evidence interval (L = search param of the highest-recall infeasible point, U = search param of the highest-QPS feasible point; all other parameters are recorded as controlled variables). A hard checker rejects `s <= L` / `s > U` and triggers LLM re-proposal.
-- **Mandatory LLM proposals**: every round's proposal must be LLM-generated — failures raise errors. All model configuration is read from `.env`.
-
----
-
 ## 1. Repository Structure
 
 ```
